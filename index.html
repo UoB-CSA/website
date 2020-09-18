@@ -25,7 +25,7 @@ var titleBColour  = "#BBBBBB";                 // table title background colour
 var bkgColour     = "#CCCCCC";                 // table border background colour
 var embossColour  = "#AAAAAA";                 // table border emboss colour
 var fontSizePix   = 12;                        // font size in pixels
-  var extendCats = ["8", "10"]; // number of categories that have no border to above cell (e.g. for multi-week coursework)
+var extendCats = ["8", "10", "14"]; // number of categories that have no border to above cell (e.g. for multi-week coursework)
 
 //ACTIVITY CATEGORIES
 var y = [
@@ -43,11 +43,13 @@ var y = [
     ["11", "Join Microsoft Teams",        "#DDDDDD", "0", "Link",      "",          ],
     ["12", "Laptop Setup",                "#DDDDDD", "0", "Link",      "",          ],
     ["13", "Pair Signup",                 "#DDDDDD", "0", "Link",      "",          ],
+    ["14", "",                            "#EFBD81", "0", "",          "",          ],
+    ["15", "",                            "#D2CDF4", "0", "",          "",          ],
 ];
 
 var a = [
 //WEEKLY ACTIVITIES
-//TYPE, DATE|TIME, ACTIVITY TITLE, ACTIVITY URL, SLIDES URL, MATERIAL START, MATERIAL RANGE
+//Category, DATE|TIME, ACTIVITY TITLE, ACTIVITY URL, SLIDES URL, MATERIAL START, MATERIAL RANGE
 
 // Week 00
 ["9","","","","",[]],
@@ -79,26 +81,26 @@ var a = [
 ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
 ["0","","Introduction & History","","",[0, 1]],
 ["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
+["2","00/00/00 | 00:00am | Microsoft Teams","Bank","","",[0]],
 ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
 // Week 05
 ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
 ["0","","Introduction & History","","",[0, 1]],
 ["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
+["14","00/00/00 | 00:00am | Microsoft Teams","Bank Continued","","",[0]],
 ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
 // Week 06
 ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
 ["0","","Introduction & History","","",[0, 1]],
 ["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
+["2","00/00/00 | 00:00am | Microsoft Teams","Posix Threads in C","","",[0]],
 ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
     
 // Week 07
 ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
 ["0","","Introduction & History","","",[0, 1]],
 ["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
+["9","","","","",[]],
 ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
 
 // Week 08
@@ -121,117 +123,7 @@ var a = [
 ["1","","Introduction to Distributed Computing","","",[0,2]],
 ["8","","","","",[]],
 ["10","","","","",[]],
-
     
-//WEEK 01
-// ["9", "",                   "",                                "", "", "0", "1"],
-// ["5", "00/00/00 | 00:00am", "GETTING YOUR PC READY",           "", "", "0", "1"],
-// ["5", "00/00/00 | 00:00am", "LINUX BASICS",                    "", "", "0", "3"],
-// ["9", "",                   "",                                "", "", "0", "1"],
-// ["10","",                   "",                                "", "", "0", "1"],
-// ["5", "00/00/00 | 00:00am", "UNDERSTANDING MARKS",             "", "", "0", "1"],
-// ["9", "",                   "",                                "", "", "0", "1"],
-// ["10","",                   "",                                "", "", "0", "1"],
-
-//WEEK 02 - WRITING SIMPLE C PROGRAMS
-// ["1", "00/00/00 | 00:00am", "WELCOME &amp; INTRODUCTION",      "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "PROCEDURES &amp; PROGRAMS",       "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "TYPES, VARIABLES &amp; SCOPE",    "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "BIG INTEGER CHALLENGE",           "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "SIMPLE C PROGRAMS",               "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "DECISIONS &amp; RECURSION",       "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "HAIL &amp; THUNDER",              "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "BIG INTEGER CHALLENGE",           "", "", "0", "3"],
-
-//WEEK 03 - HANDLING RECURSION, LOOPS AND ARRAYS
-// ["1", "00/00/00 | 00:00am", "ON LOOPS &amp; RECURSION",        "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "CALL STACK",                      "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LOOPS &amp; JUMPS",               "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "GRADE CHALLENGE",                 "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "CONTROL FLOW &amp; STACK",        "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "ARRAYS",                          "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "THE TOWERS OF HANOI",             "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "GRADE CHALLENGE",                 "", "", "0", "3"],
-
-//WEEK 04 - UNDERSTANDING STRINGS AND SEARCH
-// ["1", "00/00/00 | 00:00am", "ON SEARCH &amp; STRINGS",         "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "STRINGS",                         "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SEARCHING",                       "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "TRIANGLE CHALLENGE 1/2",          "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "SEARCH &amp; RESCUE",             "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "RUNTIME COMPLEXITY",              "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "FINDING THINGS FAST",             "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "TRIANGLE CHALLENGE",              "", "", "0", "3"],
-
-//WEEK 05 - WORKING WITH POINTERS
-// ["1", "00/00/00 | 00:00am", "ON MEMORY &amp; DATA",            "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "POINTERS",                        "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "STRUCTURES &amp; USER TYPES",     "", "", "0", "3"],
-// ["8", "",                   "",        "", ""],
-// ["2", "00/00/00 | 00:00am", "HEAP",                            "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "BITS &amp; BUGS",                 "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "BITS &amp; PIECES",               "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "TRIANGLE CHALLENGE 2/2",          "", "", "0", "3"],
-
-//WEEK 06 - HANDLING DATA STRUCTURES
-// ["1", "00/00/00 | 00:00am", "ON LISTS",                        "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "DYNAMIC DATA",                    "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LISTS I",                         "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "LIST CHALLENGE 1/2",              "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "LIST CHALLENGE",                  "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LISTS II",                        "", "", "0", "3"],
-// ["9", "",                   "",        "", ""],
-// ["7", "00/00/00 | 00:00am", "LIST CHALLENGE",                  "", "", "0", "3"],
-
-//WEEK 07 - WORKING WITH POINTERS
-// ["1", "00/00/00 | 00:00am", "ON SPACE &amp; SPEED",            "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "TREES",                           "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SORTING I",                       "", "", "0", "3"],
-// ["8", "",                   "",        "", ""],
-// ["2", "00/00/00 | 00:00am", "LIST CHALLENGE",                  "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SORTING II",                      "", "", "0", "3"],
-// ["9", "",                   "",        "", ""],
-// ["3", "00/00/00 | 00:00am", "LIST CHALLENGE 2/2",              "", "", "0", "3"],
-
-//WEEK 08 - HANDLING FILES
-// ["1", "00/00/00 | 00:00am", "ON STORAGE",                      "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "FILES I",                         "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "FILES II",                        "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "TEXT CHALLENGE 1/1",              "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "FILE HANDLING",                   "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "PREPROCESSOR",                    "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "GRAPHS",                          "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "TEXT CHALLENGE",                  "", "", "0", "3"],
-
-//WEEK 09 - ORGANISING MULTI-MODULE PROGRAMS
-// ["1", "00/00/00 | 00:00am", "ON SOFTWARE",                     "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "MODULES",                         "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "PROGRAM DESIGN",                  "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "GRAPHICS CHALLENGE 1/1",          "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "MULTI-MODULE PROGRAMS",           "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LIBRARIES",                       "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "MANDELBROT",                      "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "GRAPHICS CHALLENGE",              "", "", "0", "3"],
-
-//WEEK 10 - STARTING TO UNDERSTAND CORRECTNESS AND FINAL COURSEWORK
-// ["1", "00/00/00 | 00:00am", "SKETCH CHALLENGE INTRO",          "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "CORRECTNESS I",                   "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "CORRECTNESS II",                  "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "SKETCH CHALLENGE 1/2",            "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "SKETCH CHALLENGE",                "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "MAPS &amp; HASHES",               "", "", "0", "3"],
-// ["9", "",                   "",        "", ""],
-// ["7", "00/00/00 | 00:00am", "SKETCH CHALLENGE",                "", "", "0", "3"],
-
-//WEEK 11 - ADVANCED CONCEPTS AND FINAL COURSEWORK SUBMISSION
-// ["1", "00/00/00 | 00:00am", "C IN ITS CONTEXT",                "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "ADVANCED CONCEPTS I",             "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "ADVANCED CONCEPTS II",            "", "", "0", "3"],
-// ["8", "",                   "",        "", ""],
-// ["2", "00/00/00 | 00:00am", "SKETCH CHALLENGE",                "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SUMMARY &amp; OUTLOOK",           "", "", "0", "3"],
-// ["9", "",                   "",        "",  ""],
-// ["3", "00/00/00 | 00:00am", "SKETCH CHALLENGE 2/2",            "", "", "0", "3"],
 ];
 
 var files = [
