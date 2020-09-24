@@ -1,254 +1,150 @@
-﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-gb" lang=
+"en-gb">
+<head>
+    <meta name="style" content="cs" />
+    <title>University of Bristol - Computer Science - COMS10016:
+    Imperative and Functional Programming</title>
+    <link rel="stylesheet" type="text/css" href="corporate.css" />
+    <link rel="stylesheet" type="text/css" href="uob.css" />
+    <script language="javascript">
 
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-gb" lang="en-gb"><head>
-<meta name="style" content="cs" /><title>University of Bristol - Computer Science - COMS10016: Imperative and Functional Programming</title>
-     <link rel="stylesheet" type="text/css" href="corporate.css">
-     <link rel="stylesheet" type="text/css" href="uob.css">
-</head>
+    //LAYOUT CUSTOMIZATION
+    var currentWeek   = 20;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
+    var startWeekNum  = 0;                         // start week number [usual start is prepartion week 1]
+    var totalWeeks    = 11;                        // total teaching weeks for unit [usually 12]
+    var activityNum   = 5;                         // number of activities per week (empty slots possible)
+    var columnNum     = 5;                         // desired columns per week (yet, autofitted to max 2 rows per week)
+    var title         = "Computer Systems A";  // content title at top of the table
+    var headerOn      = 1;                         // table column headers on(=1) or off(=0), min of 4 columns needed to render
+    var header1       = "Synchronous Sessions";    // leftmost 1x column header
+    var header2       = "Asynchronous Materials";  // middle 2x column header
+    var header3       = "Courseworks &amp; Labs";  // rest of the columns header
+    var inactColour   = "#999999";                 // font colour for inactive content
+    var titleColour   = "#191919";                 // table title colour
+    var titleBColour  = "#BBBBBB";                 // table title background colour
+    var bkgColour     = "#CCCCCC";                 // table border background colour
+    var embossColour  = "#AAAAAA";                 // table border emboss colour
+    var fontSizePix   = 12;                        // font size in pixels
+    var extendCats = ["8", "10", "14"]; // number of categories that have no border to above cell (e.g. for multi-week coursework)
 
-<script language="javascript">
-
-//LAYOUT CUSTOMIZATION
-var currentWeek   = 20;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
-var startWeekNum  = 0;                         // start week number [usual start is prepartion week 1]
-var totalWeeks    = 11;                        // total teaching weeks for unit [usually 12]
-var activityNum   = 5;                         // number of activities per week (empty slots possible)
-var columnNum     = 5;                         // desired columns per week (yet, autofitted to max 2 rows per week)
-var title         = "Computer Systems A";  // content title at top of the table
-var headerOn      = 1;                         // table column headers on(=1) or off(=0), min of 4 columns needed to render
-var header1       = "Synchronous Sessions";    // leftmost 1x column header
-var header2       = "Asynchronous Materials";  // middle 2x column header
-var header3       = "Courseworks &amp; Labs";  // rest of the columns header
-var inactColour   = "#999999";                 // font colour for inactive content
-var titleColour   = "#191919";                 // table title colour
-var titleBColour  = "#BBBBBB";                 // table title background colour
-var bkgColour     = "#CCCCCC";                 // table border background colour
-var embossColour  = "#AAAAAA";                 // table border emboss colour
-var fontSizePix   = 12;                        // font size in pixels
-  var extendCats = ["8", "10"]; // number of categories that have no border to above cell (e.g. for multi-week coursework)
-
-//ACTIVITY CATEGORIES
-var y = [
-    ["0",  "Concurrent Systems Lecture",  "#D2CDF4", "1", "Slides",    "Videos",    ],
+    //ACTIVITY CATEGORIES
+    var y = [
+    ["0",  "Concurrency Lecture",         "#D2CDF4", "1", "Slides",    "Videos",    ],
     ["1",  "Distributed Systems Lecture", "#B8D2F4", "1", "Slides",    "Videos",    ],
-    ["2",  "Concurrent Systems Lab",      "#EFBD81", "1", "Lab Sheet", "",          ],
+    ["2",  "Concurrency Lab",             "#EFBD81", "1", "Lab Sheet", "",          ],
     ["3",  "Distributed Systems Lab",     "#FED872", "1", "Lab Sheet", "",          ],
-    ["4",  "Live Q&amp;A",                "#B3EA9A", "1", "",          "",          ],
+    ["4",  "Live Q&amp;A",                "#B3EA9A", "1", "Recording", "",          ],
     ["5",  "Preparation",                 "#DDDDDD", "0", "",          "",          ],
     ["6",  "Formative Coursework",        "#EEEEDD", "1", "",          "Materials", ],
     ["7",  "Coursework",                  "#EEEEDD", "0", "",          "Materials", ],
     ["8",  "",                            "#EEEEDD", "0", "",          "",          ], // Joining box for coursework over two rows
     ["9",  "",                            "#CCCCCC", "0", "",          "",          ], // Grey box
-    ["10", "",                            "#CCCCCC", "0", "",          "",          ], // Grey box with no top border 
+    ["10", "",                            "#CCCCCC", "0", "",          "",          ], // Grey box with no top border
     ["11", "Join Microsoft Teams",        "#DDDDDD", "0", "Link",      "",          ],
     ["12", "Laptop Setup",                "#DDDDDD", "0", "Link",      "",          ],
     ["13", "Pair Signup",                 "#DDDDDD", "0", "Link",      "",          ],
-];
+    ["14", "",                            "#EFBD81", "0", "",          "",          ],
+    ["15", "",                            "#D2CDF4", "0", "",          "",          ],
+    ["16", "Intro to Go",                 "#D9ABAB", "1", "Lab Sheet", "",          ],
+    ];
 
-var a = [
-//WEEKLY ACTIVITIES
-//TYPE, DATE|TIME, ACTIVITY TITLE, ACTIVITY URL, SLIDES URL, MATERIAL START, MATERIAL RANGE
 
-// Week 00
-["9","","","","",[]],
-["9","","","","",[]],
-["11","","","","https://google.com",[]],
-["12","","","","https://google.com",[]],
-["13","","","","https://google.com",[]],
+    var a = [
+    //WEEKLY ACTIVITIES
+    //Category, DATE|TIME, ACTIVITY TITLE, ACTIVITY URL, SLIDES URL, MATERIAL START, MATERIAL RANGE
 
-// Week 01
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
+    // Week 00
+    ["9","","","","",[]],
+    ["9","","","","",[]],
+    ["11","","","","https://google.com",[]],
+    ["12","","","","https://google.com",[]],
+    ["13","","","","https://google.com",[]],
 
-// Week 02
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
-// Week 03
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
-// Week 04
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
-// Week 05
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
-// Week 06
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
-    
-// Week 07
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["2","00/00/00 | 00:00am | Microsoft Teams","Intro to Go","","",[0]],
-["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
+    // Week 01
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["16","00/00/00 | 00:00am | Microsoft Teams", "Lab 1","Lab sheet","https://github.com/UoB-CSA/intro-to-go-lab-1", "", []],
+    ["16","00/00/00 | 00:00am | Microsoft Teams","Lab 2","https://github.com/UoB-CSA/intro-to-go-lab-2","", []],
 
-// Week 08
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["7","00/00/00 | 00:00am | Microsoft Teams","Distributed Game of Life","","",[0]],
-["9","","","","",[]],
-    
-// Week 08
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["8","","","","",[]],
-["10","","","","",[]],
+    // Week 02
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Towards Concurrent Programming","","",[0, 1]],
+    ["1","","Remote Invocation","","",[0,2]],
+    ["2","00/00/00 | 00:00am | Microsoft Teams","Median Filter & Parallel Tree Reduction","https://github.com/UoB-CSA/concurrency-lab-1","",[]],
+    ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server","https://github.com/UoB-CSA/distributed-lab-1","",[]],
+    // Week 03
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Deadlocks and Channel Communication","","",[0, 1]],
+    ["1","","Indirect Communication","","",[0,2]],
+    ["2","00/00/00 | 00:00am | Microsoft Teams","Producer Consumer & The Bank","https://github.com/UoB-CSA/concurrency-lab-2","",[]],
+    ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[]],
+    // Week 04
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["14","00/00/00 | 00:00am | Microsoft Teams","Bank Continued","https://github.com/UoB-CSA/concurrency-lab-3","",[]],
+    ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
+    // Week 05
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["2","00/00/00 | 00:00am | Microsoft Teams","Posix Threads in C","https://github.com/UoB-CSA/concurrency-lab-3","",[]],
+    ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
+    // Week 06
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["9","","","","",[]],
+    ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
 
-// Week 08
-["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
-["0","","Introduction & History","","",[0, 1]],
-["1","","Introduction to Distributed Computing","","",[0,2]],
-["8","","","","",[]],
-["10","","","","",[]],
+    // Week 07
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["9","","","","",[]],
+    ["3","00/00/00 | 00:00am | Microsoft Teams","Chat server in Go","","",[0]],
 
-    
-//WEEK 01
-// ["9", "",                   "",                                "", "", "0", "1"],
-// ["5", "00/00/00 | 00:00am", "GETTING YOUR PC READY",           "", "", "0", "1"],
-// ["5", "00/00/00 | 00:00am", "LINUX BASICS",                    "", "", "0", "3"],
-// ["9", "",                   "",                                "", "", "0", "1"],
-// ["10","",                   "",                                "", "", "0", "1"],
-// ["5", "00/00/00 | 00:00am", "UNDERSTANDING MARKS",             "", "", "0", "1"],
-// ["9", "",                   "",                                "", "", "0", "1"],
-// ["10","",                   "",                                "", "", "0", "1"],
+    // Week 08
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["7","00/00/00 | 00:00am | Microsoft Teams","Distributed Game of Life","","",[0]],
+    ["9","","","","",[]],
 
-//WEEK 02 - WRITING SIMPLE C PROGRAMS
-// ["1", "00/00/00 | 00:00am", "WELCOME &amp; INTRODUCTION",      "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "PROCEDURES &amp; PROGRAMS",       "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "TYPES, VARIABLES &amp; SCOPE",    "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "BIG INTEGER CHALLENGE",           "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "SIMPLE C PROGRAMS",               "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "DECISIONS &amp; RECURSION",       "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "HAIL &amp; THUNDER",              "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "BIG INTEGER CHALLENGE",           "", "", "0", "3"],
+    // Week 08
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["8","","","","",[]],
+    ["10","","","","",[]],
 
-//WEEK 03 - HANDLING RECURSION, LOOPS AND ARRAYS
-// ["1", "00/00/00 | 00:00am", "ON LOOPS &amp; RECURSION",        "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "CALL STACK",                      "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LOOPS &amp; JUMPS",               "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "GRADE CHALLENGE",                 "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "CONTROL FLOW &amp; STACK",        "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "ARRAYS",                          "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "THE TOWERS OF HANOI",             "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "GRADE CHALLENGE",                 "", "", "0", "3"],
+    // Week 08
+    ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
+    ["0","","Introduction & History","","",[0, 1]],
+    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["8","","","","",[]],
+    ["10","","","","",[]],
 
-//WEEK 04 - UNDERSTANDING STRINGS AND SEARCH
-// ["1", "00/00/00 | 00:00am", "ON SEARCH &amp; STRINGS",         "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "STRINGS",                         "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SEARCHING",                       "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "TRIANGLE CHALLENGE 1/2",          "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "SEARCH &amp; RESCUE",             "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "RUNTIME COMPLEXITY",              "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "FINDING THINGS FAST",             "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "TRIANGLE CHALLENGE",              "", "", "0", "3"],
+    ];
 
-//WEEK 05 - WORKING WITH POINTERS
-// ["1", "00/00/00 | 00:00am", "ON MEMORY &amp; DATA",            "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "POINTERS",                        "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "STRUCTURES &amp; USER TYPES",     "", "", "0", "3"],
-// ["8", "",                   "",        "", ""],
-// ["2", "00/00/00 | 00:00am", "HEAP",                            "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "BITS &amp; BUGS",                 "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "BITS &amp; PIECES",               "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "TRIANGLE CHALLENGE 2/2",          "", "", "0", "3"],
+    var files = [
+    //UNIT RESOURCES & MATERIALS
+    [  "0", "minimal.c",           "minimal.c"],
+    [  "1", "hello.c",             "hello.c"],
+    [  "2", "paint.c",             "paint.c"],
+    [  "3", "paintvar.c",          "paintvar.c"],
+    [  "4", "fullpaint.c",         "fullpaint.c"],
+    [  "5", "doublepaint.c",       "doublepaint.c"],
+    [  "6", "minimum.c",           "minimum.c"],
+    [  "7", "nexthailstone.c",     "nexthailstone.c"],
+    [  "8", "grade.c",             "grade.c"]
+    ];
 
-//WEEK 06 - HANDLING DATA STRUCTURES
-// ["1", "00/00/00 | 00:00am", "ON LISTS",                        "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "DYNAMIC DATA",                    "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LISTS I",                         "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "LIST CHALLENGE 1/2",              "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "LIST CHALLENGE",                  "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LISTS II",                        "", "", "0", "3"],
-// ["9", "",                   "",        "", ""],
-// ["7", "00/00/00 | 00:00am", "LIST CHALLENGE",                  "", "", "0", "3"],
-
-//WEEK 07 - WORKING WITH POINTERS
-// ["1", "00/00/00 | 00:00am", "ON SPACE &amp; SPEED",            "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "TREES",                           "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SORTING I",                       "", "", "0", "3"],
-// ["8", "",                   "",        "", ""],
-// ["2", "00/00/00 | 00:00am", "LIST CHALLENGE",                  "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SORTING II",                      "", "", "0", "3"],
-// ["9", "",                   "",        "", ""],
-// ["3", "00/00/00 | 00:00am", "LIST CHALLENGE 2/2",              "", "", "0", "3"],
-
-//WEEK 08 - HANDLING FILES
-// ["1", "00/00/00 | 00:00am", "ON STORAGE",                      "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "FILES I",                         "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "FILES II",                        "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "TEXT CHALLENGE 1/1",              "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "FILE HANDLING",                   "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "PREPROCESSOR",                    "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "GRAPHS",                          "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "TEXT CHALLENGE",                  "", "", "0", "3"],
-
-//WEEK 09 - ORGANISING MULTI-MODULE PROGRAMS
-// ["1", "00/00/00 | 00:00am", "ON SOFTWARE",                     "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "MODULES",                         "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "PROGRAM DESIGN",                  "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "GRAPHICS CHALLENGE 1/1",          "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "MULTI-MODULE PROGRAMS",           "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "LIBRARIES",                       "", "", "0", "3"],
-// ["4", "00/00/00 | 00:00am", "MANDELBROT",                      "", "", "0", "3"],
-// ["6", "00/00/00 | 00:00am", "GRAPHICS CHALLENGE",              "", "", "0", "3"],
-
-//WEEK 10 - STARTING TO UNDERSTAND CORRECTNESS AND FINAL COURSEWORK
-// ["1", "00/00/00 | 00:00am", "SKETCH CHALLENGE INTRO",          "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "CORRECTNESS I",                   "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "CORRECTNESS II",                  "", "", "0", "3"],
-// ["3", "00/00/00 | 00:00am", "SKETCH CHALLENGE 1/2",            "", "", "0", "3"],
-// ["2", "00/00/00 | 00:00am", "SKETCH CHALLENGE",                "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "MAPS &amp; HASHES",               "", "", "0", "3"],
-// ["9", "",                   "",        "", ""],
-// ["7", "00/00/00 | 00:00am", "SKETCH CHALLENGE",                "", "", "0", "3"],
-
-//WEEK 11 - ADVANCED CONCEPTS AND FINAL COURSEWORK SUBMISSION
-// ["1", "00/00/00 | 00:00am", "C IN ITS CONTEXT",                "", "", "0", "4"],
-// ["0", "00/00/00 | 00:00am", "ADVANCED CONCEPTS I",             "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "ADVANCED CONCEPTS II",            "", "", "0", "3"],
-// ["8", "",                   "",        "", ""],
-// ["2", "00/00/00 | 00:00am", "SKETCH CHALLENGE",                "", "", "0", "3"],
-// ["0", "00/00/00 | 00:00am", "SUMMARY &amp; OUTLOOK",           "", "", "0", "3"],
-// ["9", "",                   "",        "",  ""],
-// ["3", "00/00/00 | 00:00am", "SKETCH CHALLENGE 2/2",            "", "", "0", "3"],
-];
-
-var files = [
-//UNIT RESOURCES & MATERIALS
-[  "0", "minimal.c",           "minimal.c"],
-[  "1", "hello.c",             "hello.c"],
-[  "2", "paint.c",             "paint.c"],
-[  "3", "paintvar.c",          "paintvar.c"],
-[  "4", "fullpaint.c",         "fullpaint.c"],
-[  "5", "doublepaint.c",       "doublepaint.c"],
-[  "6", "minimum.c",           "minimum.c"],
-[  "7", "nexthailstone.c",     "nexthailstone.c"],
-[  "8", "grade.c",             "grade.c"]
-];
-
-//TILO'S RENDERING CODE
-  var c = currentWeek,
+    //TILO'S RENDERING CODE
+    var c = currentWeek,
     s = startWeekNum,
     t = totalWeeks,
     p = activityNum,
@@ -262,60 +158,60 @@ var files = [
     to = titleColour,
     f = "#FFFFFF",
     x = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-function on(i) {
+    function on(i) {
     var x = document.getElementById(i);
     x.style.display = "block";
-}
-function off(i) {
+    }
+    function off(i) {
     var x = document.getElementById(i);
     x.style.display = "none";
-}
-function tog(i) {
+    }
+    function tog(i) {
     var x = document.getElementById(i);
     if (x.style.display == "none") {
         x.style.display = "block";
     } else {
         x.style.display = "none";
     }
-}
-function e(i) {
+    }
+    function e(i) {
     document.write(i);
-}
-function r(i) {
-    return "<tr>" + i + "</tr>";
-}
-function g(i) {
-    return '<table width="100%" border="0" cellpadding="2" cellspacing="0"><tbody>' + i + "</tbody></table>";
-}
-function dd(i, c, n, m, q) {
-    return '<td width="' + m.toString() + '%" height="0" colspan="' + n.toString() + '" valign="' + q + '" bgcolor="' + c + '"><div style="font-size:' + v.toString() + 'px">' + i + "</div></td>";
-}
-function d(i, c, n, m) {
+    }
+    function r(i) {
+    return "<tr>" + i + "<\/tr>";
+    }
+    function g(i) {
+    return '<table width="100%" border="0" cellpadding="2" cellspacing="0"><tbody>' + i + "<\/tbody><\/table>";
+    }
+    function dd(i, c, n, m, q) {
+    return '<td width="' + m.toString() + '%" height="0" colspan="' + n.toString() + '" valign="' + q + '" bgcolor="' + c + '"><div style="font-size:' + v.toString() + 'px">' + i + "<\/div><\/td>";
+    }
+    function d(i, c, n, m) {
     return dd(i, c, n, m, "top");
-}
-function rr(i, kk) {
+    }
+    function rr(i, kk) {
     var ii = "";
     for (k = 0; k < pp; k++) {
         if (cw.includes(a[i * p + k + kk - pp][0])) {
             ii = ii + d("", o, 1, 0) + d("", b, 1, 0) + d("", y[parseInt(a[i * p + k + kk - pp][0])][2], 1, 0);
         } else ii = ii + d("", o, 1, 0) + d("", b, 2, 0);
     }
-    return "<tr>" + d("", o, 1, 0) + d("", b, 1, 0) + ii + d("", b, 1, 0) + d("", o, 1, 0) + "</tr>";
-}
-function z(i) {
+    return "<tr>" + d("", o, 1, 0) + d("", b, 1, 0) + ii + d("", b, 1, 0) + d("", o, 1, 0) + "<\/tr>";
+    }
+    function z(i) {
     return dd(
-        '<div style="font-size:' + (v + 3).toString() + 'px;transform:rotate(270deg);"><strong><font color="' + o + '">Week</font><font color="' + b + '">.</font><font color="' + o + '">' + i + "</font></strong></div>",
+        '<div style="font-size:' + (v + 3).toString() + 'px;transform:rotate(270deg);"><strong><font color="' + o + '">Week<\/font><font color="' + b + '">.<\/font><font color="' + o + '">' + i + "<\/font><\/strong><\/div>",
         b,
         1,
         0,
         "middle"
     );
-}
-function u(i) {
+    }
+    function u(i) {
     var uu = "'";
-    return r(d("", o, 1, 0) + d("", tc, 3, 0) + d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + title + "</font></strong></div>", tc, i - 2, 0) + d("", o, 1, 0));
-}
-function uu(i) {
+    return r(d("", o, 1, 0) + d("", tc, 3, 0) + d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + title + "<\/font><\/strong><\/div>", tc, i - 2, 0) + d("", o, 1, 0));
+    }
+    function uu(i) {
     if (headerOn == 0) return "";
     var uuu = "'";
     return (
@@ -324,29 +220,29 @@ function uu(i) {
             d("", o, 1, 0) +
                 d("", tc, 1, 0) +
                 d("", o, 1, 0) +
-                d("", b, 1, 0) + 
-                d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + header1 + "</font></strong></div>", b, 1, 0) +
+                d("", b, 1, 0) +
+                d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + header1 + "<\/font><\/strong><\/div>", b, 1, 0) +
                 d("", o, 1, 0) +
-                d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + header2 + "</font></strong></div>", b, 5, 0) +
+                d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + header2 + "<\/font><\/strong><\/div>", b, 5, 0) +
                 d("", o, 1, 0) +
-                d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + header3 + "</font></strong></div>", b, i - 10, 0) +
+                d('<div style="font-size:' + (v + 3).toString() + 'px"><strong><font color="' + to + '">' + header3 + "<\/font><\/strong><\/div>", b, i - 10, 0) +
                 d("", o, 1, 0)
         )
     );
-}
-function xx(i) {
+    }
+    function xx(i) {
     if (y[parseInt(a[i][0])][3] == "1") return x[parseInt(a[i][0])].toString() + ":";
     else return "";
-}
-function mmm(i) {
-    var ii = a[i][1] + '<br/><div style="font-size:' + (v + 3).toString() + 'px"><strong>' + y[parseInt(a[i][0])][1] + " " + xx(i) + '</strong></div><a target="_blank" href="' + a[i][3] + '"><strong>' + a[i][2] + "</strong></a>";
+    }
+    function mmm(i) {
+    var ii = a[i][1] + '<br/><div style="font-size:' + (v + 3).toString() + 'px"><strong>' + y[parseInt(a[i][0])][1] + " " + xx(i) + '<\/strong><\/div><a target="_blank" href="' + a[i][3] + '"><strong>' + a[i][2] + "<\/strong><\/a>";
     if ((i + 1) / p - 1 > c - s)
         ii =
             '<font color="' +
             ic +
             '">' +
             a[i][1] +
-            '</font><br/><div style="font-size:' +
+            '<\/font><br/><div style="font-size:' +
             (v + 3).toString() +
             'px"><font color="' +
             ic +
@@ -354,14 +250,14 @@ function mmm(i) {
             y[parseInt(a[i][0])][1] +
             " " +
             xx(i) +
-            '</strong></font></div><strong><font color="' +
+            '<\/strong><\/font><\/div><strong><font color="' +
             ic +
             '">' +
             a[i][2] +
-            "</font></strong>";
+            "<\/font><\/strong>";
     return ii;
-}
-function gg(i, k) {
+    }
+    function gg(i, k) {
     var ii = d("", o, 1, 0);
     for (j = 0; j < pp; j++) {
         if (i * p + j + k - pp < i * p + p) {
@@ -373,26 +269,26 @@ function gg(i, k) {
         } else ii = ii + d("", o, 3, 0);
     }
     return ii + d("", o, 1, 0);
-}
-function zz(i) {
+    }
+    function zz(i) {
     var k,
         m = "";
 
     for (k = 0; k < a[i][5].length; k++) {
-        m = m + '<a target="_blank" href="' + files[a[i][5][k]][1] + '"><i>' + files[a[i][5][k]][2] + "</i></a>";
+        m = m + '<a target="_blank" href="' + files[a[i][5][k]][1] + '"><i>' + files[a[i][5][k]][2] + "<\/i><\/a>";
         if (k + 1 < a[i][5].length) m = m + "<br/>";
-        
+
     }
-    
+
     return m;
-}
-function mm(i) {
+    }
+    function mm(i) {
     if ((i + 1) / p - 1 > c - s) return "";
     var uu = "'";
     var m = "";
-    if (y[parseInt(a[i][0])][4] != "") m = m + '<a target="_blank" href="' + a[i][4] + '">' + y[parseInt(a[i][0])][4] + "</a>";
+    if (y[parseInt(a[i][0])][4] != "") m = m + '<a target="_blank" href="' + a[i][4] + '">' + y[parseInt(a[i][0])][4] + "<\/a>";
     if (y[parseInt(a[i][0])][4] != "" && y[parseInt(a[i][0])][5] != "") m = m + ", ";
-    if (y[parseInt(a[i][0])][5] != "") m = m + '<a href="javascript:tog(' + uu + "l" + i.toString() + uu + ')">' + y[parseInt(a[i][0])][5] + "</a>";
+    if (y[parseInt(a[i][0])][5] != "") m = m + '<a href="javascript:tog(' + uu + "l" + i.toString() + uu + ')">' + y[parseInt(a[i][0])][5] + "<\/a>";
     if (y[parseInt(a[i][0])][4] + y[parseInt(a[i][0])][5] == "") m = "";
     else m = "(" + m + ")";
     m =
@@ -401,16 +297,16 @@ function mm(i) {
         i.toString() +
         '"><hr/><table width="100%" border="0" cellpadding="2" cellspacing="0"><tbody><tr><td width="0%" valign="top"><u><i>' +
         y[parseInt(a[i][0])][5] +
-        ':</i></u></td><td width="100%" valign="top">' +
+        ':<\/i><\/u><\/td><td width="100%" valign="top">' +
         zz(i) +
-        "</td></tr></tbody></table></div>";
+        "<\/td><\/tr><\/tbody><\/table><\/div>";
     return m;
-}
-function w(i) {
+    }
+    function w(i) {
     x[parseInt(a[i][0])]++;
     return d(mmm(i) + "<br/>" + mm(i), y[parseInt(a[i][0])][2], 1, 100 / pp);
-}
-function m() {
+    }
+    function m() {
     if ((1.0 * p) / pp > 2) pp = p / 2;
     if (pp > p) pp = p;
     if (pp < 4) header = 0;
@@ -438,16 +334,18 @@ function m() {
         j = j + r(d("", o, 1, 0) + d("", bb, 1, 0) + gg(i, pp * hh)) + rr(i, pp * hh) + r(h + d("", b, 1, 0) + d("", o, 1, 0));
     }
     e(g(j + r(d("", o, 4 + 3 * pp, 0)) + r(d("", b, 4 + 3 * pp, 0))));
-}
-function make() {
+    }
+    function make() {
     m();
     var i;
     for (i = 0; i < t * p; i++) off("l" + i.toString());
-}
+    }
 
-  </script>
-
+    </script>
+</head>
 <body>
-  <script language="javascript">make();</script>
+    <script language="javascript">
+    make();
+    </script>
 </body>
 </html>
