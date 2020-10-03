@@ -12,8 +12,8 @@
     //LAYOUT CUSTOMIZATION
     var currentWeek   = 1;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
     var startWeekNum  = 0;                         // start week number [usual start is prepartion week 1]
-    var totalWeeks    = 2;                        // total teaching weeks for unit [usually 12]
-    var activityNum   = 5;                         // number of activities per week (empty slots possible)
+    var totalWeeks    = 2;                        // total teaching weeks for unit [usually 12] - 5
+    var activityNum   = 10;                         // number of activities per week (empty slots possible) - 5
     var columnNum     = 5;                         // desired columns per week (yet, autofitted to max 2 rows per week)
     var title         = "Computer Systems A";  // content title at top of the table
     var headerOn      = 1;                         // table column headers on(=1) or off(=0), min of 4 columns needed to render
@@ -30,7 +30,7 @@
 
     //ACTIVITY CATEGORIES
     var y = [
-    ["0",  "Concurrency Lecture",         "#D2CDF4", "1", "Slides",    "Videos",    ],
+    ["0",  "Concurrency Lecture",         "#D2CDF4", "1", "",    "Videos",    ],
     ["1",  "Distributed Systems Lecture", "#B8D2F4", "1", "Slides",    "Videos",    ],
     ["2",  "Concurrency Lab",             "#EFBD81", "1", "",          "",          ],
     ["3",  "Distributed Systems Lab",     "#FED872", "1", "",          "",          ],
@@ -47,6 +47,8 @@
     ["14", "",                            "#EFBD81", "0", "",          "",          ], // joining box for concurrency lab over two rows
     ["15", "",                            "#D2CDF4", "0", "",          "",          ], // Joining box for concurrency lecture over two rows
     ["16", "Intro to Go",                 "#D9ABAB", "1", "",          "",          ],
+	["17", "Concurrency Lecture Short",   "#cce6ff", "1", "",    "Videos",    ],
+	["18", "Navigating the Unit",  		  "#DDDDDD", "0", "",    "Videos",    ],
     ];
 
 
@@ -56,17 +58,28 @@
 
     // Week 00
     ["9","","","","",[]],
-    ["9","","","","",[]],
+    ["18","","Guide to getting started","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008_navigating_unit.pdf","",[5]],
     ["11","","","","https://teams.microsoft.com/l/team/19%3aecaa5d359adf45e4bc4a4914801294df%40thread.tacv2/conversations?groupId=b48b81f3-96e8-4540-8284-0b84e55a6e85&tenantId=b2e47f30-cd7d-4a4e-a5da-b18cf1a4151b",[]], // Add link
     ["12","","","","https://github.com/UoB-CSA/setup-guides",[]],
     ["13","","","","https://doodle.com/poll/349eakgezig7wtde",[]], // Add link
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     // Week 01
     ["4","05/10/20 | 10:00am | Microsoft Teams","","","",[]],
-    ["0","","Introduction & History","","",[0, 1]],
-    ["1","","Introduction to Distributed Computing","","",[0,2]],
+    ["0","","Introduction & History","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008sh01.pdf","",[0,1]],
+    ["0","","Towards Concurrent Programming","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008sh02.pdf","",[3,4]],
     ["16","05/10/20 | 1:00pm | Microsoft Teams", "Lab 1","https://github.com/UoB-CSA/intro-to-go-lab-1", "", []],
     ["16","08/10/20 | 10:00am | Microsoft Teams","Lab 2","https://github.com/UoB-CSA/intro-to-go-lab-2","", []],
+    ["9","","","","",[]],
+    ["17","","Producer Consumer at high Level","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/ProducerConsumerProblemComs20008.pdf","",[2]],
+	["17","","Select and Timers","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008_SelectAndTimers.pdf","",[6]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     // Week 02
     ["4","12/10/20 | 10:00m | Microsoft Teams","","","",[]],
@@ -74,30 +87,60 @@
     ["1","","Remote Invocation","","",[0,2]],
     ["2","12/10/20 | 1:00pm | Microsoft Teams","Median Filter & Parallel Tree Reduction","https://github.com/UoB-CSA/concurrency-lab-1","",[]],
     ["3","15/10/20 | 10:00am | Microsoft Teams","Chat server","https://github.com/UoB-CSA/distributed-lab-1","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+	
+	
     // Week 03
     ["4","19/10/20 | 10:00am | Microsoft Teams","","","",[]],
     ["0","","Deadlocks and Channel Communication","","",[0, 1]],
     ["1","","Indirect Communication","","",[0,2]],
     ["2","19/10/20 | 1:00pm | Microsoft Teams","Producer Consumer & The Bank","https://github.com/UoB-CSA/concurrency-lab-2","",[]],
     ["3","22/10/20 | 10:00am | Microsoft Teams","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+	
     // Week 04
     ["4","26/10/20 | 10:00am | Microsoft Teams","","","",[]],
     ["0","","","","",[0, 1]],
     ["1","","","","",[0,2]],
     ["14","26/10/20 | 1:00pm | Microsoft Teams","Bank Continued","https://github.com/UoB-CSA/concurrency-lab-3","",[]],
     ["3","29/10/20 | 10:00am | Microsoft Teams","","","",[0]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+	
     // Week 05
     ["4","02/11/20 | 10:00am | Microsoft Teams","","","",[]],
     ["0","","","","",[0, 1]],
     ["1","","","","",[0,2]],
     ["2","02/11/20 | 1:00pm | Microsoft Teams","Posix Threads in C","https://github.com/UoB-CSA/concurrency-lab-3","",[]],
     ["3","05/11/20 | 10:00am | Microsoft Teams","","","",[0]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+	
     // Week 06
     ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
     ["0","","","","",[0, 1]],
     ["1","","","","",[0,2]],
     ["9","","","","",[]],
     ["3","00/00/00 | 00:00am | Microsoft Teams","","","",[0]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     // Week 07
     ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
@@ -105,6 +148,11 @@
     ["1","","","","",[0,2]],
     ["7","00/00/00 | 00:00am | Microsoft Teams","Distributed Game of Life","","",[0]],
     ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     // Week 08
     ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
@@ -112,6 +160,11 @@
     ["1","","","","",[0,2]],
     ["8","","","","",[]],
     ["10","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     // Week 08
     ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
@@ -119,6 +172,11 @@
     ["1","","","","",[0,2]],
     ["8","","","","",[]],
     ["10","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     // Week 08
     ["4","00/00/00 | 00:00am | Microsoft Teams","","","",[]],
@@ -126,20 +184,26 @@
     ["1","","","","",[0,2]],
     ["9","","","","",[]],
     ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
+    ["9","","","","",[]],
+	["9","","","","",[]],
 
     ];
 
     var files = [
     //UNIT RESOURCES & MATERIALS
-    [  "0", "minimal.c",           "minimal.c"],
-    [  "1", "hello.c",             "hello.c"],
-    [  "2", "paint.c",             "paint.c"],
-    [  "3", "paintvar.c",          "paintvar.c"],
-    [  "4", "fullpaint.c",         "fullpaint.c"],
-    [  "5", "doublepaint.c",       "doublepaint.c"],
-    [  "6", "minimum.c",           "minimum.c"],
-    [  "7", "nexthailstone.c",     "nexthailstone.c"],
-    [  "8", "grade.c",             "grade.c"]
+    [  "0", "https://mediasite.bris.ac.uk/Mediasite/Play/f30d87bbd7a94516be78f5010fe25a531d",           "Part 1, Introduction"],
+    [  "1", "https://mediasite.bris.ac.uk/Mediasite/Play/ff6e4cf208014c578fb12dfeec4129a71d",             "Part 2, History"],
+    [  "2", "https://mediasite.bris.ac.uk/Mediasite/Play/92defe1312fd4cf8b041dee40bf41c4a1d",             "Producer Consumer Problem"],
+	[  "3", "https://mediasite.bris.ac.uk/Mediasite/Play/37ef01f58922400e8dbea769975cdf761d",             "Part 1 (Conceptual)"],
+    [  "4", "https://mediasite.bris.ac.uk/Mediasite/Play/49522945f1634f17aa74a2db0b1123091d",          "Part 2 (Go syntax)"],
+    [  "5", "https://mediasite.bris.ac.uk/Mediasite/Play/893802e722ab4a2eaf85658fb20970bd1d",         "Navigating the unit"],
+    [  "6", "doublepaint.c",       "doublepaint.c"],
+    [  "7", "https://mediasite.bris.ac.uk/Mediasite/Play/40772fccfd8b4bfea5df778cd53ad0ec1d",           "Lec 3, Part 1"],
+    [  "8", "https://mediasite.bris.ac.uk/Mediasite/Play/ce83a30b88a84c56886a2a2f0c44a5c61d",     "Lec 3, Part 2"],
+    [  "9", "grade.c",             "grade.c"]
     ];
 
     //TILO'S RENDERING CODE
