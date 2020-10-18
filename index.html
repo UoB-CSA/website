@@ -10,9 +10,9 @@
     <script language="javascript">
 
     //LAYOUT CUSTOMIZATION
-    var currentWeek   = 2;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
+    var currentWeek   = 3;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
     var startWeekNum  = 0;                         // start week number [usual start is prepartion week 1]
-    var totalWeeks    = 3;                        // total teaching weeks for unit [usually 12] - 5
+    var totalWeeks    = 4;                        // total teaching weeks for unit [usually 12] - 5
     var activityNum   = 10;                         // number of activities per week (empty slots possible) - 5
     var columnNum     = 5;                         // desired columns per week (yet, autofitted to max 2 rows per week)
     var title         = "Computer Systems A";  // content title at top of the table
@@ -96,12 +96,12 @@
 	
     // Week 03
     ["4","19/10/20 | 10:00am | Microsoft Teams","","","",[]],
-    ["0","","Deadlocks and Channel Communication","","",[0, 1]],
-    ["1","","Indirect Communication","","",[0,2]],
+    ["0","","Sharing Memory, Locks, semaphores, suspension and Critical Sections ","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008sh05.pdf","",[13, 14]],
+    ["1","","Indirect Communication","","",[]],
     ["2","19/10/20 | 1:00pm | Microsoft Teams","Producer Consumer & The Bank","https://github.com/UoB-CSA/concurrency-lab-2","",[]],
     ["3","22/10/20 | 10:00am | Microsoft Teams","","","",[]],
 	["9","","","","",[]],
-    ["9","","","","",[]],
+    ["0","","Sharing Memory: mutexes and critical sections completed, producer consumer in detail with sempahores","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008sh06.pdf","",[15, 16]],
 	["9","","","","",[]],
     ["9","","","","",[]],
 	["9","","","","",[]],
@@ -206,7 +206,13 @@
     [  "9", "grade.c",             "grade.c"],
     [  "10", "https://mediasite.bris.ac.uk/Mediasite/Play/a0f5f63857f344e69e6d0c20cc357ce91d",    "Introduction to Distributed Computing"],
     [  "11", "https://mediasite.bris.ac.uk/Mediasite/Play/61a1466318d940cd83d17e08cb363dd41d",    "Networks & Models"],
-    [  "12", "https://mediasite.bris.ac.uk/Mediasite/Play/ade6137f51694f2c8f8183c0d375c53f1d",    "Message Passing in Go"]
+    [  "12", "https://mediasite.bris.ac.uk/Mediasite/Play/ade6137f51694f2c8f8183c0d375c53f1d",    "Message Passing in Go"],
+	[  "13", "https://mediasite.bris.ac.uk/Mediasite/Play/f6102004ecab4dcd90219a76d7705bfa1d",    "Memory sharing, locks etc. Part 1"],
+	[  "14", "https://mediasite.bris.ac.uk/Mediasite/Play/7297cf1b135546a7b487b9f384ed50751d",    "Memory sharing, locks etc. Part 2"],
+	[  "15", "https://mediasite.bris.ac.uk/Mediasite/Play/ca5937b493cc49ff924f334fed8fe7a71d",    "Part 1: Memory sharing and mutexes completed"],
+	[  "16", "https://mediasite.bris.ac.uk/Mediasite/Play/824728f331fa4947ae5e8c249a9e37de1d",    "Part 2: Producer Consumer with semaphores"]
+	
+	
     ];
 
     //TILO'S RENDERING CODE
