@@ -10,9 +10,9 @@
     <script language="javascript">
 
     //LAYOUT CUSTOMIZATION
-    var currentWeek   = 3;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
+    var currentWeek   = 4;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
     var startWeekNum  = 0;                         // start week number [usual start is prepartion week 1]
-    var totalWeeks    = 4;                        // total teaching weeks for unit [usually 12] - 5
+    var totalWeeks    = 5;                        // total teaching weeks for unit [usually 12] - 5
     var activityNum   = 10;                         // number of activities per week (empty slots possible) - 5
     var columnNum     = 5;                         // desired columns per week (yet, autofitted to max 2 rows per week)
     var title         = "Computer Systems A";  // content title at top of the table
@@ -31,7 +31,7 @@
     //ACTIVITY CATEGORIES
     var y = [
     ["0",  "Concurrency Lecture",         "#D2CDF4", "1", "",    "Videos",    ],
-    ["1",  "Distributed Systems Lecture", "#B8D2F4", "1", "Slides",    "Videos",    ],
+    ["1",  "Distributed Systems Lecture", "#B8D2F4", "1", "",    "Content",    ],
     ["2",  "Concurrency Lab",             "#EFBD81", "1", "",          "",          ],
     ["3",  "Distributed Systems Lab",     "#FED872", "1", "",          "",          ],
     ["4",  "Live Q&amp;A",                "#B3EA9A", "1", "Recording", "",          ],
@@ -85,7 +85,7 @@
     // Week 02
     ["4","12/10/20 | 10:00m | Microsoft Teams","","","https://web.microsoftstream.com/video/ffcefe10-1b7d-4738-86dd-5e9b44a8ef2e",[]],
     ["0","","Deadlock & Channel Communication","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008sh03.pdf","",[7,8]],
-    ["1","","Introduction to Distributed Systems","","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me01.pdf",[10,11,12]],
+    ["1","","Introduction to Distributed Systems","","",[10,20,11,21,12]],
     ["2","12/10/20 | 1:00pm | Microsoft Teams","Median Filter & Parallel Tree Reduction","https://github.com/UoB-CSA/concurrency-lab-1","",[]],
     ["3","15/10/20 | 10:00am | Microsoft Teams","Chat server","https://github.com/UoB-CSA/distributed-lab-1","",[]],
 	["9","","","","",[]],
@@ -98,7 +98,7 @@
     // Week 03
     ["4","19/10/20 | 10:00am | Microsoft Teams","","","",[]],
     ["0","","Sharing Memory, Locks, semaphores, suspension and Critical Sections ","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008sh05.pdf","",[13, 14]],
-    ["1","","Remote Invocation","","https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me03.pdf",[17,18,19]],
+    ["1","","Remote Invocation","","",[17,22,18,23,19]],
     ["2","19/10/20 | 1:00pm | Microsoft Teams","Producer Consumer & The Bank","https://github.com/UoB-CSA/concurrency-lab-2","",[]],
     ["3","22/10/20 | 10:00am | Microsoft Teams","Secret Strings & Bottles","https://github.com/UoB-CSA/distributed-lab-2","",[]],
 	["9","","","","",[]],
@@ -110,9 +110,9 @@
     // Week 04
     ["4","26/10/20 | 10:00am | Microsoft Teams","","","",[]],
     ["0","","","","",[0, 1]],
-    ["1","","","","",[0,2]],
-    ["14","26/10/20 | 1:00pm | Microsoft Teams","Bank Continued","https://github.com/UoB-CSA/concurrency-lab-3","",[]],
-    ["3","29/10/20 | 10:00am | Microsoft Teams","","","",[0]],
+    ["1","","Indirect Communication","","",[24,25,26,27]],
+    ["14","26/10/20 | 1:00pm | Microsoft Teams","Bank Continued","https://github.com/UoB-CSA/concurrency-lab-2","",[]],
+    ["3","29/10/20 | 10:00am | Microsoft Teams","Secret Strings & Bottles [continued]","https://github.com/UoB-CSA/distributed-lab-2","",[]],
 	["9","","","","",[]],
     ["9","","","","",[]],
 	["9","","","","",[]],
@@ -214,7 +214,15 @@
 	[  "16", "https://mediasite.bris.ac.uk/Mediasite/Play/824728f331fa4947ae5e8c249a9e37de1d",    "Part 2: Producer Consumer with semaphores"],
     [  "17", "https://mediasite.bris.ac.uk/Mediasite/Play/71338462962143a195aa6471ce5f6f7f1d", "UDP & TCP"],
     [  "18", "https://mediasite.bris.ac.uk/Mediasite/Play/1dcfffb5a04d4739896f687ee16c1d961d", "Remote Procedure Calls"],
-    [  "19", "https://mediasite.bris.ac.uk/Mediasite/Play/b3dcbb2035b5430c863a07920357aa211d", "RPC in Go"]
+    [  "19", "https://mediasite.bris.ac.uk/Mediasite/Play/b3dcbb2035b5430c863a07920357aa211d", "RPC in Go"],
+    [ "20", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me01.pdf",  "Introduction to Distributed Computing [slides]"],
+    [ "21", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me02.pdf",  "Networks & Models [slides]"],
+    [ "22", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me03.pdf",  "UDP & TCP [slides]"],
+    [ "23", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me04.pdf",  "Remote Procedure Calls [slides]"],
+    [ "24", "https://mediasite.bris.ac.uk/Mediasite/Play/986a28e3970744e39bcc98916e26e9fb1d", "The Publish-Subscribe Model"],
+    [ "25", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me05.pdf",  "The Publish-Subscribe Model [slides]"],
+    [ "26", "https://mediasite.bris.ac.uk/Mediasite/Play/e65543d8640b4ac191e35ad42b4ca5571d", "Distributed Shared Memory"],
+    [ "27", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me06.pdf",  "Distributed Shared Memory [slides]"]
 	
     ];
 
