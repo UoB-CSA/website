@@ -10,9 +10,9 @@
     <script language="javascript">
 
     //LAYOUT CUSTOMIZATION
-    var currentWeek   = 4;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
+    var currentWeek   = 5;                         // current week [triggers full week visibility, starting with 1, usually going up to 12]
     var startWeekNum  = 0;                         // start week number [usual start is prepartion week 1]
-    var totalWeeks    = 5;                        // total teaching weeks for unit [usually 12] - 5
+    var totalWeeks    = 6;                        // total teaching weeks for unit [usually 12] - 5
     var activityNum   = 10;                         // number of activities per week (empty slots possible) - 5
     var columnNum     = 5;                         // desired columns per week (yet, autofitted to max 2 rows per week)
     var title         = "Computer Systems A";  // content title at top of the table
@@ -122,9 +122,9 @@
     // Week 05
     ["4","02/11/20 | 10:00am | Microsoft Teams","","","",[]],
     ["0","","","","",[0, 1]],
-    ["1","","","","",[0,2]],
+    ["1","","Global State","","",[32,33,34,35]],
     ["2","02/11/20 | 1:00pm | Microsoft Teams","Posix Threads in C","https://github.com/UoB-CSA/concurrency-lab-3","",[]],
-    ["3","05/11/20 | 10:00am | Microsoft Teams","","","",[0]],
+    ["3","05/11/20 | 10:00am | Microsoft Teams","Message Broker in Go","","https://github.com/UoB-CSA/distributed-lab-3",[0]],
 	["9","","","","",[]],
     ["9","","","","",[]],
 	["9","","","","",[]],
@@ -226,7 +226,11 @@
 	[  "28", "https://mediasite.bris.ac.uk/Mediasite/Play/3bee7b5216be4cd9b48f8cbbd9736a5a1d",    "Critical section, mutex and semaphore recap"],
 	[  "29", "https://mediasite.bris.ac.uk/Mediasite/Play/87b579329cb14b0aabe970dabb2cbdec1d",    "Condition variables in full detail"],
 	[  "30", "https://mediasite.bris.ac.uk/Mediasite/Play/27a3e18f4aab47539cf84590bc02318f1d",    "Real-ish world example: semaphores for mutliple client server application"],
-	[  "31", "https://mediasite.bris.ac.uk/Mediasite/Play/994659b85c004f9983599ab504aeaf4a1d",    "COMS20008, Lecture 6, Trailer"]
+	[  "31", "https://mediasite.bris.ac.uk/Mediasite/Play/994659b85c004f9983599ab504aeaf4a1d",    "COMS20008, Lecture 6, Trailer"],
+  [  "32", "https://mediasite.bris.ac.uk/Mediasite/Play/820d954e4c0c4bea8bd9f9984923a29b1d",  "Consistent Global State"],
+  [  "33", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me07.pdf", "Consistent Global State [slides]"],
+  [  "34", "https://mediasite.bris.ac.uk/Mediasite/Play/544aaee177f246379897a6ee6960ef711d",  "Chandy-Lamport Snapshotting Algorithm"],
+  [  "35", "https://www.ole.bris.ac.uk/bbcswebdav/courses/COMS20008_2020_TB-1/CONTENT_2020/LecturePDFs/coms20008me08.pdf", "Chandy-Lamport Snapshotting Algorithm [slides]"]
 	
     ];
 
