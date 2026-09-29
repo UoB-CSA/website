@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Closure Visualization: makeImmutableMatrix</title>
+    <style>
+        /* Standardized, clean font stack to prevent variable rendering issues */
+        body {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.6;
+        }
+        
+        h1, h2, h3 {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+        }
+        
+        h1 { margin-bottom: 0.5rem; text-align: center; }
+        p.subtitle { margin-bottom: 2rem; color: #555; text-align: center; max-width: 800px; }
+        
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1000px;
+            justify-content: center;
+        }
+        
+        .box {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            flex: 1;
+            min-width: 320px;
+        }
+        
+        /* The Closure Vault */
+        .closure-vault {
+            border: 3px solid #6f42c1;
+            background-color: #f8f0fc;
+            position: relative;
+            padding-top: 3rem;
+        }
+        .vault-label {
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background: #6f42c1;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-bottom: 1rem;
+        }
+        .cell {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            border-radius: 4px;
+            transition: background 0.3s, color 0.3s;
+        }
+        .cell.highlight {
+            background: #20c997;
+            color: white;
+            font-weight: bold;
+        }
+        
+        /* Worker Thread */
+        .worker-box {
+            border: 3px solid #007bff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .code-block {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            width: 100%;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+        }
+        .keyword { color: #c678dd; }
+        .func-name { color: #61afef; }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.95rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        button:hover { background-color: #0056b3; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-danger:hover { background-color: #c82333; }
+        
+        .log-panel {
+            background: #e9ecef;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            height: 120px;
+            overflow-y: auto;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ced4da;
+        }
+
+        .explanation {
+            margin-top: 2.5rem;
+            background: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            border-left: 5px solid #20c997;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            max-width: 1000px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .explanation ul {
+            padding-left: 20px;
+        }
+        
+        .explanation li {
+            margin-bottom: 1rem;
+        }
+        
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            color: #d63384;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>The Go Closure: <code>makeImmutableMatrix</code></h1>
+    <p class="subtitle">Visualizing how closures capture state to enforce read-only data access across concurrent goroutines.</p>
+
+    <div class="container">
+        <!-- The Closure Environment -->
+        <div class="box closure-vault">
+            <div class="vault-label">Closure Environment (Lexical Scope)</div>
+            
+            <p><strong>Captured Variable:</strong> <code>matrix [][]uint8</code></p>
+            <div class="matrix-grid" id="matrixGrid">
+                <!-- 3x3 Grid representing a chunk of the image -->
+                <div class="cell" id="cell-0-0">145</div>
+                <div class="cell" id="cell-0-1">150</div>
+                <div class="cell" id="cell-0-2">148</div>
+                <div class="cell" id="cell-1-0">142</div>
+                <div class="cell" id="cell-1-1">200</div>
+                <div class="cell" id="cell-1-2">147</div>
+                <div class="cell" id="cell-2-0">140</div>
+                <div class="cell" id="cell-2-1">146</div>
+                <div class="cell" id="cell-2-2">149</div>
+            </div>
+            <p style="font-size: 0.9rem; color: #666; margin-top: 1rem;">This 2D slice is hidden inside the closure. External code cannot access it directly.</p>
+        </div>
+
+        <!-- The Worker Thread -->
+        <div class="box worker-box">
+            <h3>Worker Thread</h3>
+            <div class="code-block"><span class="keyword">func</span> <span class="func-name">worker</span>(...) {
+    <span style="color:#5c6370;">// Worker only has the returned function!</span>
+    <span class="keyword">for</span> {
+        pixel := data(y, x)
+    }
+}</div>
+            
+            <div class="button-group">
+                <button onclick="requestData(1, 1)">Read: data(1, 1)</button>
+                <button onclick="requestData(0, 2)">Read: data(0, 2)</button>
+                <button class="btn-danger" onclick="attemptWrite(1, 1, 255)">Write: matrix[1][1] = 255</button>
+            </div>
+            
+            <div class="log-panel" id="logPanel">
+                System ready. Awaiting thread actions...
+            </div>
+        </div>
+    </div>
+
+    <div class="explanation">
+        <h3>How It Works & The Reasoning Behind It</h3>
+        <p>In the program, the main thread creates a 2D slice of pixel luminances. Before passing this data to the worker goroutines, it wraps the slice in a closure using <code>makeImmutableMatrix</code>.</p>
+        
+        <ul>
+            <li><strong>How the Closure Works:</strong> The function <code>makeImmutableMatrix(matrix [][]uint8)</code> returns an anonymous function: <code>func(y, x int) uint8</code>. This anonymous function "closes over" or captures the <code>matrix</code> variable from its surrounding scope. Even after the outer function finishes executing, the returned anonymous function retains a reference to the specific <code>matrix</code> instance it was created with. When a worker calls <code>data(y, x)</code>, the closure dives into its captured scope, retrieves <code>matrix[y][x]</code>, and returns the <code>uint8</code> value.</li>
+            <li><strong>Reasoning 1: Enforced Immutability (Thread Safety):</strong> Go slices are reference types. If you pass a <code>[][]uint8</code> directly into multiple concurrent worker goroutines, there is nothing stopping a rogue worker from accidentally writing to the slice (e.g., <code>matrix[y][x] = 0</code>). By passing a function that <em>only returns</em> a value, you physically remove the ability to write to the underlying array. It creates a strict read-only API.</li>
+            <li><strong>Reasoning 2: Abstraction:</strong> The median filter algorithm logic shouldn't need to know the underlying memory layout of the image data. By asking for a <code>func(y, x int) uint8</code>, the filter logic is decoupled from the storage structure. If you later decided to store the image as a 1D slice or generate pixels procedurally, you would only have to change the closure, not the complex sorting math inside the workers.</li>
+        </ul>
+    </div>
+
+    <script>
+        function logMessage(msg, isError = false) {
+            const panel = document.getElementById('logPanel');
+            const color = isError ? '#dc3545' : '#28a745';
+            panel.innerHTML += `<div style="color: ${color}; padding: 2px 0;">> ${msg}</div>`;
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        function resetHighlights() {
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('highlight'));
+        }
+
+        function requestData(y, x) {
+            resetHighlights();
+            const id = `cell-${y}-${x}`;
+            const cell = document.getElementById(id);
+            const val = cell.innerText;
+            
+            logMessage(`Calling closure: data(${y}, ${x})`);
+            
+            setTimeout(() => {
+                cell.classList.add('highlight');
+                logMessage(`Closure returned pixel value: ${val}`);
+            }, 300);
+        }
+
+        function attemptWrite(y, x, val) {
+            resetHighlights();
+            logMessage(`Attempting: matrix[${y}][${x}] = ${val}...`, true);
+            
+            setTimeout(() => {
+                logMessage(`ERROR: Cannot write to matrix. Worker only has access to func(y, x) uint8, not the slice!`, true);
+            }, 400);
+        }
+    </script>
+</body>
+</html>
