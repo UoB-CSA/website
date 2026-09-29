@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Go Concurrency: CSP vs Shared Memory & Locks</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #11111b;
+            color: #cdd6f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        h2 { color: #89b4fa; margin-bottom: 5px; }
+        p.sub { color: #a6adc8; font-size: 14px; margin-bottom: 20px; text-align: center; max-width: 900px; }
+        
+        .grid {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1240px;
+        }
+        .card {
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            flex: 1;
+        }
+        .card h3 { margin-top: 0; color: #f9e2af; font-size: 15px; text-align: center; }
+        canvas {
+            display: block;
+            background: #11111b;
+            border-radius: 6px;
+            border: 1px solid #313244;
+            width: 100%;
+            height: 320px;
+        }
+        
+        .terminal {
+            width: 100%;
+            max-width: 1240px;
+            margin-top: 20px;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #a6e3a1;
+            height: 160px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 12px;
+        }
+        button {
+            background-color: #313244;
+            color: #cdd6f4;
+            border: 2px solid #89b4fa;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover { background-color: #89b4fa; color: #11111b; }
+        button:disabled { border-color: #585b70; color: #585b70; cursor: not-allowed; background-color: #181825; }
+    </style>
+</head>
+<body>
+
+    <h2>Concurrency Paradigm Comparison</h2>
+    <p class="sub">
+        <strong>"Do not communicate by sharing memory; instead, share memory by communicating."</strong><br>
+        Comparing Go's CSP Channel Handoff with Shared Memory Mutex Locking & Condition Variable Signaling.
+    </p>
+
+    <div class="grid">
+        <!-- CSP Panel -->
+        <div class="card">
+            <h3>1. CSP Model (Synchronous Go Channel)</h3>
+            <canvas id="cspCanvas" width="600" height="320"></canvas>
+        </div>
+
+        <!-- Shared Memory Panel -->
+        <div class="card">
+            <h3>2. Shared Memory Model (Mutex & Condition Variable)</h3>
+            <canvas id="memCanvas" width="600" height="320"></canvas>
+        </div>
+    </div>
+
+    <!-- Console Log -->
+    <div class="terminal" id="termBody">$ Concurrency Paradigm Simulation Initialized...</div>
+
+    <div class="controls">
+        <button id="btnRun" onclick="runSimulation()">Simulate Interaction Round</button>
+        <button id="btnReset" onclick="resetAll()" style="border-color: #f38ba8;">Reset</button>
+    </div>
+
+    <script>
+        const cspCanvas = document.getElementById('cspCanvas');
+        const cspCtx = cspCanvas.getContext('2d');
+        const memCanvas = document.getElementById('memCanvas');
+        const memCtx = memCanvas.getContext('2d');
+        const term = document.getElementById('termBody');
+
+        // State Machine Vars
+        let cspDataPos = 0; // 0 = at Sender, 1 = in Flight, 2 = at Receiver
+        let cspSenderState = "Idle";
+        let cspReceiverState = "Idle";
+
+        let memMutexLocked = false;
+        let memOwner = null; // 'Thread 1', 'Thread 2', or null
+        let memData = "State: Unmodified";
+        let memCondWaiting = false;
+
+        let isRunning = false;
+
+        function drawCSP() {
+            cspCtx.clearRect(0, 0, 600, 320);
+
+            // Goroutine 1 (Sender)
+            cspCtx.strokeStyle = "#89b4fa";
+            cspCtx.lineWidth = 2;
+            cspCtx.strokeRect(20, 40, 150, 230);
+            cspCtx.fillStyle = "#89b4fa";
+            cspCtx.font = "bold 13px sans-serif";
+            cspCtx.fillText("Goroutine A (Sender)", 28, 65);
+            cspCtx.font = "11px monospace";
+            cspCtx.fillStyle = "#cdd6f4";
+            cspCtx.fillText("ch <- data", 28, 95);
+            
+            ctxWrappedText(cspCtx, `[${cspSenderState}]`, 28, 125, 135, 
+                cspSenderState.includes("Blocked") ? "#f38ba8" : "#a6e3a1");
+
+            // Goroutine 2 (Receiver)
+            cspCtx.strokeStyle = "#cba6f7";
+            cspCtx.lineWidth = 2;
+            cspCtx.strokeRect(430, 40, 150, 230);
+            cspCtx.fillStyle = "#cba6f7";
+            cspCtx.font = "bold 13px sans-serif";
+            cspCtx.fillText("Goroutine B (Receiver)", 438, 65);
+            cspCtx.font = "11px monospace";
+            cspCtx.fillStyle = "#cdd6f4";
+            cspCtx.fillText("data := <-ch", 438, 95);
+
+            ctxWrappedText(cspCtx, `[${cspReceiverState}]`, 438, 125, 135, 
+                cspReceiverState.includes("Blocked") ? "#f38ba8" : "#a6e3a1");
+
+            // Synchronous Channel Conduit
+            cspCtx.strokeStyle = "#a6e3a1";
+            cspCtx.lineWidth = 2;
+            cspCtx.beginPath();
+            cspCtx.moveTo(170, 150);
+            cspCtx.lineTo(430, 150);
+            cspCtx.stroke();
+
+            // Arrow head
+            cspCtx.fillStyle = "#a6e3a1";
+            cspCtx.beginPath();
+            cspCtx.moveTo(430, 150);
+            cspCtx.lineTo(420, 144);
+            cspCtx.lineTo(420, 156);
+            cspCtx.closePath();
+            cspCtx.fill();
+
+            cspCtx.font = "11px monospace";
+            cspCtx.fillText("Synchronous Channel", 235, 130);
+            cspCtx.fillText("(unbuffered)", 260, 144);
+
+            // Payload Dot
+            if (cspDataPos > 0 && cspDataPos < 2) {
+                const currentX = 170 + (430 - 170) * cspDataPos;
+                cspCtx.fillStyle = "#a6e3a1";
+                cspCtx.beginPath();
+                cspCtx.arc(currentX, 150, 8, 0, Math.PI * 2);
+                cspCtx.fill();
+            }
+
+            // Sync Barrier Indicator
+            cspCtx.strokeStyle = "#f9e2af";
+            cspCtx.setLineDash([4, 4]);
+            cspCtx.beginPath();
+            cspCtx.moveTo(300, 90);
+            cspCtx.lineTo(300, 210);
+            cspCtx.stroke();
+            cspCtx.setLineDash([]);
+            cspCtx.fillStyle = "#f9e2af";
+            cspCtx.font = "11px sans-serif";
+            cspCtx.fillText("Sync Rendezvous", 255, 225);
+            cspCtx.fillText("Point", 285, 240);
+        }
+
+        function drawMem() {
+            memCtx.clearRect(0, 0, 600, 320);
+
+            // Thread 1
+            memCtx.strokeStyle = "#89b4fa";
+            memCtx.lineWidth = 2;
+            memCtx.strokeRect(20, 40, 140, 110);
+            memCtx.fillStyle = "#89b4fa";
+            memCtx.font = "bold 12px sans-serif";
+            memCtx.fillText("Thread 1 (Writer)", 28, 65);
+            memCtx.font = "11px monospace";
+            memCtx.fillStyle = memOwner === 'Thread 1' ? "#a6e3a1" : "#a6adc8";
+            memCtx.fillText(memOwner === 'Thread 1' ? "HOLDS LOCK" : "Waiting...", 28, 90);
+
+            // Thread 2
+            memCtx.strokeStyle = "#cba6f7";
+            memCtx.lineWidth = 2;
+            memCtx.strokeRect(20, 160, 140, 110);
+            memCtx.fillStyle = "#cba6f7";
+            memCtx.font = "bold 12px sans-serif";
+            memCtx.fillText("Thread 2 (Reader)", 28, 185);
+            memCtx.font = "11px monospace";
+            memCtx.fillStyle = memCondWaiting ? "#f38ba8" : (memOwner === 'Thread 2' ? "#a6e3a1" : "#a6adc8");
+            
+            ctxWrappedText(memCtx, memCondWaiting ? "Cond.Wait() Blocked" : (memOwner === 'Thread 2' ? "HOLDS LOCK" : "Waiting..."), 
+                28, 205, 125, memCondWaiting ? "#f38ba8" : (memOwner === 'Thread 2' ? "#a6e3a1" : "#a6adc8"));
+
+            // Central Mutex & Shared Memory Box
+            memCtx.strokeStyle = memMutexLocked ? "#f38ba8" : "#a6e3a1";
+            memCtx.lineWidth = 2;
+            memCtx.strokeRect(200, 40, 380, 230);
+
+            memCtx.fillStyle = memMutexLocked ? "#f38ba8" : "#a6e3a1";
+            memCtx.font = "bold 13px sans-serif";
+            memCtx.fillText(`sync.Mutex [${memMutexLocked ? "LOCKED" : "UNLOCKED"}]`, 215, 68);
+
+            memCtx.fillStyle = "#f9e2af";
+            memCtx.font = "11px monospace";
+            memCtx.fillText(`sync.Cond (Condition Variable)`, 215, 95);
+
+            // Shared Variable Box inside Memory
+            memCtx.fillStyle = "#181825";
+            memCtx.fillRect(215, 115, 350, 135);
+            memCtx.strokeStyle = "#45475a";
+            memCtx.lineWidth = 1;
+            memCtx.strokeRect(215, 115, 350, 135);
+
+            memCtx.fillStyle = "#a6e3a1";
+            memCtx.font = "bold 12px monospace";
+            memCtx.fillText("Shared Memory Variable:", 228, 145);
+            memCtx.fillStyle = "#cdd6f4";
+            memCtx.font = "12px monospace";
+            memCtx.fillText(`data = "${memData}"`, 228, 180);
+        }
+
+        function ctxWrappedText(ctx, text, x, y, maxWidth, color) {
+            ctx.fillStyle = color;
+            let words = text.split(' ');
+            let line = '';
+            let currentY = y;
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = ctx.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    ctx.fillText(line, x, currentY);
+                    line = words[n] + ' ';
+                    currentY += 15;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, x, currentY);
+        }
+
+        function render() {
+            drawCSP();
+            drawMem();
+            requestAnimationFrame(render);
+        }
+
+        async function runSimulation() {
+            if (isRunning) return;
+            isRunning = true;
+            document.getElementById('btnRun').disabled = true;
+
+            printTerm("\n--- Starting Simultaneous Execution ---");
+
+            // STEP 1: Receivers Wait / Mutex Locking
+            cspSenderState = "Preparing payload";
+            cspReceiverState = "Blocked on receive";
+            printTerm("[CSP]: Goroutine B arrives at 'data := <-ch' and BLOCKS waiting for sender.");
+
+            memCondWaiting = true;
+            printTerm("[Memory]: Thread 2 calls 'mu.Lock()' -> 'cond.Wait()' and releases lock to sleep.");
+            await sleep(1200);
+
+            // STEP 2: Sender Sends / Mutex Acquired
+            cspSenderState = "Blocked on send";
+            printTerm("[CSP]: Goroutine A executes 'ch <- data'. Both goroutines hit rendezvous barrier!");
+
+            memOwner = 'Thread 1';
+            memMutexLocked = true;
+            printTerm("[Memory]: Thread 1 acquires 'mu.Lock()'. Thread 1 mutates shared variable directly.");
+            await sleep(1000);
+
+            // STEP 3: Transfer & Signal
+            // CSP Handoff
+            let step = 0;
+            while (step <= 1.0) {
+                cspDataPos = step;
+                step += 0.04;
+                await sleep(20);
+            }
+            cspDataPos = 0;
+            cspSenderState = "Unblocked / Resumed";
+            cspReceiverState = "Unblocked / Resumed";
+            printTerm("[CSP]: Payload transferred directly from A stack to B stack. Both unblock!");
+
+            // Shared Memory Signal
+            memData = "State: Updated by T1";
+            printTerm("[Memory]: Thread 1 calls 'cond.Signal()' and releases 'mu.Unlock()'.");
+            memOwner = null;
+            memMutexLocked = false;
+            await sleep(800);
+
+            // STEP 4: Thread 2 Wakes Up
+            memCondWaiting = false;
+            memOwner = 'Thread 2';
+            memMutexLocked = true;
+            printTerm("[Memory]: Thread 2 re-acquires 'mu.Lock()', reads updated memory, then unlocks.");
+            await sleep(1000);
+
+            memOwner = null;
+            memMutexLocked = false;
+            printTerm("[Complete]: Round finished.");
+
+            isRunning = false;
+            document.getElementById('btnRun').disabled = false;
+        }
+
+        function printTerm(text) {
+            term.innerText += text + "\n";
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function resetAll() {
+            isRunning = false;
+            cspDataPos = 0;
+            cspSenderState = "Idle";
+            cspReceiverState = "Idle";
+
+            memMutexLocked = false;
+            memOwner = null;
+            memData = "State: Unmodified";
+            memCondWaiting = false;
+
+            term.innerText = "$ Concurrency Paradigm Simulation Initialized...";
+            document.getElementById('btnRun').disabled = false;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        render();
+    </script>
+</body>
+</html>

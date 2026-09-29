@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Go Concurrency Simulation: Quiz Lab 2</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #11111b;
+            color: #cdd6f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 { margin: 0 0 15px 0; color: #89b4fa; }
+        .main-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .canvas-card {
+            position: relative;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        canvas {
+            display: block;
+            border-radius: 8px;
+        }
+        /* Overlay UI Elements on Canvas */
+        .timer-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(24, 24, 37, 0.95);
+            border: 2px solid #f38ba8;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            text-align: right;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .timer-label { font-size: 10px; color: #a6adc8; text-transform: uppercase; }
+        .timer-val { font-size: 22px; font-weight: bold; color: #f38ba8; }
+
+        /* Terminal Window */
+        .terminal-card {
+            width: 340px;
+            height: 500px;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .terminal-header {
+            background-color: #313244;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #a6adc8;
+            font-weight: bold;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-red { background-color: #f38ba8; }
+        .dot-yellow { background-color: #f9e2af; }
+        .dot-green { background-color: #a6e3a1; }
+        .terminal-body {
+            flex: 1;
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            color: #a6e3a1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        /* Control Panel */
+        .controls {
+            margin-top: 18px;
+            display: flex;
+            gap: 12px;
+        }
+        button {
+            background-color: #313244;
+            color: #cdd6f4;
+            border: 2px solid #89b4fa;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background-color: #89b4fa;
+            color: #11111b;
+        }
+        button:disabled {
+            border-color: #585b70;
+            color: #585b70;
+            cursor: not-allowed;
+            background-color: #181825;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Go Concurrency Execution Simulator</h2>
+
+    <div class="main-container">
+        <!-- Canvas Visualizer with Countdown Overlay -->
+        <div class="canvas-card">
+            <canvas id="vizCanvas" width="700" height="500"></canvas>
+            <div class="timer-badge">
+                <div class="timer-label">time.After (5.0s)</div>
+                <div id="timerDisplay" class="timer-val">5.0s</div>
+            </div>
+        </div>
+
+        <!-- Simulated Interactive Terminal -->
+        <div class="terminal-card">
+            <div class="terminal-header">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span style="margin-left: 8px;">os.Stdin / os.Stdout</span>
+            </div>
+            <div id="terminalBody" class="terminal-body">$ go run quiz.go\n</div>
+        </div>
+    </div>
+
+    <!-- Scenario Controls -->
+    <div class="controls">
+        <button id="btnPerfect" onclick="startScenario('perfect')">Scenario 1: All Correct</button>
+        <button id="btnMixed" onclick="startScenario('mixed')">Scenario 2: Mixed Answers</button>
+        <button id="btnTimeout" onclick="startScenario('timeout')">Scenario 3: Timeout Triggered</button>
+        <button id="btnReset" onclick="resetAll()">Reset</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('vizCanvas');
+        const ctx = canvas.getContext('2d');
+        const term = document.getElementById('terminalBody');
+        const timerDisplay = document.getElementById('timerDisplay');
+
+        // Loaded directly from quiz-questions.csv
+        const questions = [
+            { q: "3*2", a: "6" },
+            { q: "50/10", a: "5" },
+            { q: "2+1+1+1", a: "5" },
+            { q: "3^3", a: "27" },
+            { q: "3+3", a: "6" },
+            { q: "4/2", a: "2" }
+        ];
+
+        // State Machine Vars
+        let packets = [];
+        let activeWorker = null;
+        let selectedCase = null;
+        let score = 0;
+        let logMessage = "Idle. Select a scenario to run.";
+        
+        // Timer Mechanics
+        let timerInterval = null;
+        let currentScenario = null;
+        let isRunning = false;
+
+        // Static Layout Bounding Boxes
+        const mainBox = { x: 30, y: 130, w: 230, h: 250, label: "Main Goroutine" };
+        const selectBox = { x: 45, y: 200, w: 200, h: 160 };
+        const scoreChan = { startX: 470, startY: 180, endX: 260, endY: 180, label: "scoreChan" };
+        const timerChan = { startX: 470, startY: 340, endX: 260, endY: 340, label: "timeOver" };
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Main Goroutine Container
+            ctx.strokeStyle = "#89b4fa";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(mainBox.x, mainBox.y, mainBox.w, mainBox.h);
+            ctx.fillStyle = "#89b4fa";
+            ctx.font = "bold 15px sans-serif";
+            ctx.fillText(mainBox.label, mainBox.x + 10, mainBox.y - 10);
+            ctx.fillText(`s (score) = ${score}`, mainBox.x + 15, mainBox.y + 35);
+
+            // 2. Draw Select Statement Block
+            ctx.strokeStyle = selectedCase ? (selectedCase === 'score' ? "#a6e3a1" : "#f38ba8") : "#f9e2af";
+            ctx.lineWidth = selectedCase ? 3 : 1.5;
+            ctx.strokeRect(selectBox.x, selectBox.y, selectBox.w, selectBox.h);
+            
+            ctx.fillStyle = "#f9e2af";
+            ctx.font = "12px monospace";
+            ctx.fillText("select {", selectBox.x + 10, selectBox.y + 25);
+            
+            ctx.fillStyle = selectedCase === 'score' ? "#a6e3a1" : "#cdd6f4";
+            ctx.fillText(" case newScore := <-scoreChan:", selectBox.x + 10, selectBox.y + 55);
+            ctx.fillText("    s = newScore", selectBox.x + 10, selectBox.y + 75);
+            
+            ctx.fillStyle = selectedCase === 'timeout' ? "#f38ba8" : "#cdd6f4";
+            ctx.fillText(" case <-timeOver:", selectBox.x + 10, selectBox.y + 110);
+            ctx.fillText("    return", selectBox.x + 10, selectBox.y + 130);
+            
+            ctx.fillStyle = "#f9e2af";
+            ctx.fillText("}", selectBox.x + 10, selectBox.y + 150);
+
+            // 3. Draw Channel Arrows
+            drawArrow(scoreChan.startX, scoreChan.startY, scoreChan.endX, scoreChan.endY, "#a6e3a1", "scoreChan (chan score)");
+            drawArrow(timerChan.startX, timerChan.startY, timerChan.endX, timerChan.endY, "#f38ba8", "timeOver (<-chan Time)");
+
+            // 4. Draw Active Worker Goroutine Box
+            if (activeWorker) {
+                ctx.strokeStyle = "#cba6f7";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(activeWorker.x, activeWorker.y, 200, 110);
+                ctx.fillStyle = "#cba6f7";
+                ctx.font = "bold 13px sans-serif";
+                ctx.fillText(`Goroutine: ask(q${activeWorker.qIdx + 1})`, activeWorker.x + 10, activeWorker.y - 10);
+                ctx.font = "12px monospace";
+                ctx.fillStyle = "#cdd6f4";
+                ctx.fillText(`q: "${questions[activeWorker.qIdx].q}"`, activeWorker.x + 10, activeWorker.y + 30);
+                ctx.fillText("scanner.Scan()", activeWorker.x + 10, activeWorker.y + 55);
+                ctx.fillStyle = "#a6e3a1";
+                ctx.fillText("newScore <- s", activeWorker.x + 10, activeWorker.y + 85);
+            }
+
+            // 5. Draw Animated Payload Packets
+            packets.forEach((p, index) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Handle Channel Arrival at Main Select Box
+                if (p.x <= p.targetX) {
+                    selectedCase = p.type;
+                    if (p.type === 'score') {
+                        score = p.val;
+                        logMessage = `select evaluated <-scoreChan. Score updated to ${score}`;
+                    } else {
+                        logMessage = "select evaluated <-timeOver! Timeout reached.";
+                    }
+                    packets.splice(index, 1);
+                    activeWorker = null;
+                }
+            });
+
+            // 6. Footer Status Log Bar
+            ctx.fillStyle = "#313244";
+            ctx.fillRect(0, canvas.height - 35, canvas.width, 35);
+            ctx.fillStyle = "#cdd6f4";
+            ctx.font = "13px sans-serif";
+            ctx.fillText("Status: " + logMessage, 15, canvas.height - 12);
+
+            requestAnimationFrame(draw);
+        }
+
+        function drawArrow(fromx, fromy, tox, toy, color, label) {
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(fromx, fromy);
+            ctx.lineTo(tox, toy);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(tox, toy);
+            ctx.lineTo(tox + 8, toy - 5);
+            ctx.lineTo(tox + 8, toy + 5);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.font = "11px monospace";
+            ctx.fillText(label, (fromx + tox) / 2 - 40, fromy - 10);
+        }
+
+        // Terminal Helper
+        function printTerm(text) {
+            term.innerText += text + "\n";
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // Scenario Execution Engine
+        async function startScenario(type) {
+            if (isRunning) return;
+            resetAll();
+            isRunning = true;
+            toggleButtons(true);
+            currentScenario = type;
+
+            // Start 5.0s Cumulative Timer (time.After)
+            const startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                let remaining = (5.0 - elapsed).toFixed(1);
+                if (remaining <= 0) {
+                    remaining = "0.0";
+                    clearInterval(timerInterval);
+                    if (currentScenario === 'timeout') {
+                        triggerTimeoutEvent();
+                    }
+                }
+                timerDisplay.innerText = remaining + "s";
+            }, 100);
+
+            // Execute Sequential Question Loop
+            if (type === 'perfect' || type === 'mixed') {
+                for (let i = 0; i < questions.length; i++) {
+                    if (!isRunning) break;
+                    // In 'mixed', answer odd-indexed questions wrong
+                    const shouldAnswerCorrectly = type === 'perfect' || (i % 2 === 0);
+                    await processQuestion(i, shouldAnswerCorrectly);
+                }
+                if (isRunning) {
+                    clearInterval(timerInterval);
+                    printTerm(`End of questions, final score ${score}`);
+                    logMessage = "Program finished all questions successfully.";
+                    isRunning = false;
+                    toggleButtons(false);
+                }
+            } else if (type === 'timeout') {
+                // Process Q1 and Q2 fast, then stall on Q3 until timeout
+                await processQuestion(0, true);
+                if (isRunning) await processQuestion(1, true);
+                if (isRunning) {
+                    spawnWorker(2);
+                    printTerm(questions[2].q);
+                    printTerm("Enter answer: ");
+                    logMessage = "Goroutine blocked on Stdin... Timer ticking down.";
+                }
+            }
+        }
+
+        function processQuestion(qIdx, isCorrect) {
+            return new Promise((resolve) => {
+                spawnWorker(qIdx);
+                const q = questions[qIdx];
+                printTerm(q.q);
+
+                // Speed adjustments: Prompt input after 150ms and travel packet across channel quickly
+                setTimeout(() => {
+                    const userAns = isCorrect ? q.a : "0";
+                    printTerm(`Enter answer: ${userAns}`);
+
+                    if (isCorrect) {
+                        printTerm("Correct!");
+                    } else {
+                        printTerm("Incorrect :-(");
+                    }
+
+                    // Compute score value sent by ask() goroutine
+                    const payloadScore = isCorrect ? score + 1 : score;
+
+                    // Send payload across scoreChan
+                    packets.push({
+                        x: scoreChan.startX,
+                        y: scoreChan.startY,
+                        targetX: scoreChan.endX,
+                        vx: -12, // Increased velocity so packet reaches target faster
+                        vy: 0,
+                        color: "#a6e3a1",
+                        type: "score",
+                        val: payloadScore
+                    });
+
+                    // Fast delay before next question
+                    setTimeout(() => {
+                        resolve();
+                    }, 250);
+
+                }, 150);
+            });
+        }
+
+        function spawnWorker(qIdx) {
+            selectedCase = null;
+            activeWorker = { x: 470, y: 120, qIdx: qIdx };
+            logMessage = `go ask(s, q[${qIdx}], scoreChan) spawned context.`;
+        }
+
+        function triggerTimeoutEvent() {
+            packets.push({
+                x: timerChan.startX,
+                y: timerChan.startY,
+                targetX: timerChan.endX,
+                vx: -12,
+                vy: 0,
+                color: "#f38ba8",
+                type: "timeout"
+            });
+
+            setTimeout(() => {
+                printTerm(`Timed out, final score ${score}`);
+                logMessage = "select block caught timeOver channel! Program exiting.";
+                isRunning = false;
+                toggleButtons(false);
+            }, 300);
+        }
+
+        function resetAll() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            packets = [];
+            activeWorker = null;
+            selectedCase = null;
+            score = 0;
+            timerDisplay.innerText = "5.0s";
+            term.innerText = "$ go run quiz.go\n";
+            logMessage = "Reset completed. Ready for scenario selection.";
+            toggleButtons(false);
+        }
+
+        function toggleButtons(disabled) {
+            document.getElementById('btnPerfect').disabled = disabled;
+            document.getElementById('btnMixed').disabled = disabled;
+            document.getElementById('btnTimeout').disabled = disabled;
+        }
+
+        // Start Animation Frame Loop
+        draw();
+    </script>
+</body>
+</html>

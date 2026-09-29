@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Go Concurrency Visualizer - Question 2 Ping Pong</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #11111b;
+            color: #cdd6f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 { margin: 0 0 5px 0; color: #89b4fa; }
+        p.subtitle { margin: 0 0 15px 0; color: #a6adc8; font-size: 14px; text-align: center; }
+        .main-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .canvas-card {
+            position: relative;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        canvas { display: block; border-radius: 8px; }
+
+        /* Terminal Window */
+        .terminal-card {
+            width: 380px;
+            height: 500px;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .terminal-header {
+            background-color: #313244;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #a6adc8;
+            font-weight: bold;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-red { background-color: #f38ba8; }
+        .dot-yellow { background-color: #f9e2af; }
+        .dot-green { background-color: #a6e3a1; }
+        .terminal-body {
+            flex: 1;
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #a6e3a1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        /* Control Panel */
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background-color: #313244;
+            color: #cdd6f4;
+            border: 2px solid #89b4fa;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover { background-color: #89b4fa; color: #11111b; }
+        button.active { background-color: #89b4fa; color: #11111b; border-color: #b4befe; }
+        button:disabled { border-color: #585b70; color: #585b70; cursor: not-allowed; background-color: #181825; }
+    </style>
+</head>
+<body>
+
+    <h2>Go Concurrency: Ping-Pong Communication</h2>
+    <p class="subtitle">Simulating Questions 2a (Single Round) & 2b (Infinite Loop)</p>
+
+    <div class="main-container">
+        <div class="canvas-card">
+            <canvas id="vizCanvas" width="700" height="500"></canvas>
+        </div>
+
+        <div class="terminal-card">
+            <div class="terminal-header">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span style="margin-left: 8px;">os.Stdout</span>
+            </div>
+            <div id="terminalBody" class="terminal-body">$ go run ping.go\n</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btn2a" class="active" onclick="startQuestion2a()">Question 2a: Single Round</button>
+        <button id="btn2b" onclick="startQuestion2b()">Question 2b: Infinite Loop (500ms Timer)</button>
+        <button id="btnReset" onclick="resetAll()" style="border-color: #f38ba8;">Reset</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('vizCanvas');
+        const ctx = canvas.getContext('2d');
+        const term = document.getElementById('terminalBody');
+
+        // Bounding Coordinates
+        const fooBox = { x: 50, y: 150, w: 180, h: 200, label: "Goroutine: foo()" };
+        const barBox = { x: 470, y: 150, w: 180, h: 200, label: "Goroutine: bar()" };
+
+        const pingChan = { startX: 230, startY: 200, endX: 470, endY: 200, label: "pings (chan string)" };
+        const pongChan = { startX: 470, startY: 300, endX: 230, endY: 300, label: "pongs (chan string)" };
+
+        // State Machine Vars
+        let packets = [];
+        let fooState = "Idle";
+        let barState = "Idle";
+        let mode = '2a';
+        let isRunning = false;
+        let loopTimeout = null;
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Goroutines
+            ctx.strokeStyle = "#89b4fa";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(fooBox.x, fooBox.y, fooBox.w, fooBox.h);
+            ctx.fillStyle = "#89b4fa";
+            ctx.font = "bold 15px sans-serif";
+            ctx.fillText(fooBox.label, fooBox.x + 10, fooBox.y - 10);
+            ctx.font = "12px monospace";
+            ctx.fillStyle = "#cdd6f4";
+            ctx.fillText("State: " + fooState, fooBox.x + 15, fooBox.y + 40);
+
+            ctx.strokeStyle = "#cba6f7";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barBox.x, barBox.y, barBox.w, barBox.h);
+            ctx.fillStyle = "#cba6f7";
+            ctx.font = "bold 15px sans-serif";
+            ctx.fillText(barBox.label, barBox.x + 10, barBox.y - 10);
+            ctx.font = "12px monospace";
+            ctx.fillStyle = "#cdd6f4";
+            ctx.fillText("State: " + barState, barBox.x + 15, barBox.y + 40);
+
+            // 2. Draw Channel Arrows
+            drawArrow(pingChan.startX, pingChan.startY, pingChan.endX, pingChan.endY, "#a6e3a1", pingChan.label);
+            drawArrow(pongChan.startX, pongChan.startY, pongChan.endX, pongChan.endY, "#f9e2af", pongChan.label);
+
+            // 3. Draw Packet Animations
+            packets.forEach((p, index) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                p.x += p.vx;
+
+                // Ping Arrived at Bar
+                if (p.type === 'ping' && p.x >= p.targetX) {
+                    barState = "Received ping";
+                    printTerm("Bar has received: ping");
+                    packets.splice(index, 1);
+                    
+                    setTimeout(() => {
+                        barState = "Sending pong";
+                        printTerm("Bar is sending: pong");
+                        packets.push({
+                            x: pongChan.startX,
+                            y: pongChan.startY,
+                            targetX: pongChan.endX,
+                            vx: -6,
+                            color: "#f9e2af",
+                            type: "pong"
+                        });
+                    }, 400);
+                }
+
+                // Pong Arrived at Foo
+                if (p.type === 'pong' && p.x <= p.targetX) {
+                    fooState = "Received pong";
+                    printTerm("Foo has received: pong\n");
+                    packets.splice(index, 1);
+
+                    if (mode === '2b' && isRunning) {
+                        setTimeout(() => {
+                            triggerPing();
+                        }, 400);
+                    } else {
+                        isRunning = false;
+                    }
+                }
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        function drawArrow(fromx, fromy, tox, toy, color, label) {
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(fromx, fromy);
+            ctx.lineTo(tox, toy);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(tox, toy);
+            if (fromx < tox) {
+                ctx.lineTo(tox - 8, toy - 5);
+                ctx.lineTo(tox - 8, toy + 5);
+            } else {
+                ctx.lineTo(tox + 8, toy - 5);
+                ctx.lineTo(tox + 8, toy + 5);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.font = "12px monospace";
+            ctx.fillText(label, (fromx + tox) / 2 - 60, fromy - 10);
+        }
+
+        function triggerPing() {
+            if (!isRunning) return;
+            fooState = "Sending ping";
+            printTerm("Foo is sending: ping");
+            packets.push({
+                x: pingChan.startX,
+                y: pingChan.startY,
+                targetX: pingChan.endX,
+                vx: 6,
+                color: "#a6e3a1",
+                type: "ping"
+            });
+        }
+
+        function startQuestion2a() {
+            resetAll();
+            mode = '2a';
+            isRunning = true;
+            document.getElementById('btn2a').classList.add('active');
+            document.getElementById('btn2b').classList.remove('active');
+            triggerPing();
+        }
+
+        function startQuestion2b() {
+            resetAll();
+            mode = '2b';
+            isRunning = true;
+            document.getElementById('btn2b').classList.add('active');
+            document.getElementById('btn2a').classList.remove('active');
+            triggerPing();
+
+            // Simulate main() time.Sleep(500ms) cutoff after 3 seconds of real-time viewing
+            loopTimeout = setTimeout(() => {
+                isRunning = false;
+                printTerm("--- time.Sleep(500ms) expired. Program terminated.");
+            }, 3000);
+        }
+
+        function printTerm(text) {
+            term.innerText += text + "\n";
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function resetAll() {
+            clearTimeout(loopTimeout);
+            isRunning = false;
+            packets = [];
+            fooState = "Idle";
+            barState = "Idle";
+            term.innerText = "$ go run ping.go\n";
+        }
+
+        draw();
+    </script>
+</body>
+</html>

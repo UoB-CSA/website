@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Go Concurrency & Select Visualizer - Lab 2 Question 3</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #11111b;
+            color: #cdd6f4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 { margin: 0 0 5px 0; color: #89b4fa; }
+        p.subtitle { margin: 0 0 15px 0; color: #a6adc8; font-size: 14px; text-align: center; }
+        .main-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .canvas-card {
+            position: relative;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        canvas { display: block; border-radius: 8px; }
+
+        /* Terminal Window */
+        .terminal-card {
+            width: 380px;
+            height: 540px;
+            background-color: #181825;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .terminal-header {
+            background-color: #313244;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #a6adc8;
+            font-weight: bold;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-red { background-color: #f38ba8; }
+        .dot-yellow { background-color: #f9e2af; }
+        .dot-green { background-color: #a6e3a1; }
+        .terminal-body {
+            flex: 1;
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #a6e3a1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        /* Scenario Explanation Box */
+        .info-card {
+            margin-top: 15px;
+            width: 1160px;
+            background: #181825;
+            border: 1px solid #45475a;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #bac2de;
+        }
+        .info-card strong { color: #89b4fa; }
+
+        /* Control Panel */
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            background-color: #313244;
+            color: #cdd6f4;
+            border: 2px solid #89b4fa;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover { background-color: #89b4fa; color: #11111b; }
+        button.active { background-color: #89b4fa; color: #11111b; border-color: #b4befe; }
+        button:disabled { border-color: #585b70; color: #585b70; cursor: not-allowed; background-color: #181825; }
+    </style>
+</head>
+<body>
+
+    <h2>Go Concurrency: Multi-Channel `select` Visualizer</h2>
+    <p class="subtitle">Simulating Questions 3a, 3b, 3c, and 3d from Intro to Go Lab 2</p>
+
+    <div class="main-container">
+        <div class="canvas-card">
+            <canvas id="vizCanvas" width="760" height="540"></canvas>
+        </div>
+
+        <div class="terminal-card">
+            <div class="terminal-header">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span style="margin-left: 8px;">Stdout (fmt.Println)</span>
+            </div>
+            <div id="terminalBody" class="terminal-body">$ go run select.go\n</div>
+        </div>
+    </div>
+
+    <div id="infoBox" class="info-card">
+        <strong>Scenario Explanation:</strong> Select a scenario below to run its visualization.
+    </div>
+
+    <div class="controls">
+        <button id="btn3A" class="active" onclick="switchScenario('3a')">Question 3a: Original 2 Senders</button>
+        <button id="btn3B" onclick="switchScenario('3b')">Question 3b: Added `fasterSender` (200ms)</button>
+        <button id="btn3C" onclick="switchScenario('3c')">Question 3c: Added `default` Case with 3s Sleep</button>
+        <button id="btn3D" onclick="switchScenario('3d')">Question 3d: Set Channel Buffers to 10</button>
+        <button id="btnPause" onclick="togglePause()" style="border-color: #f9e2af;">Pause / Resume</button>
+        <button id="btnReset" onclick="resetAll()" style="border-color: #f38ba8;">Reset</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('vizCanvas');
+        const ctx = canvas.getContext('2d');
+        const term = document.getElementById('terminalBody');
+        const infoBox = document.getElementById('infoBox');
+
+        // Layout Bounding Geometry
+        const mainBox = { x: 30, y: 110, w: 260, h: 380, label: "Main Goroutine" };
+        const selectBox = { x: 45, y: 155, w: 230, h: 310 };
+
+        // Configuration Parameters
+        let mode = '3a';
+        let bufferCap = 0;
+        let hasDefault = false;
+        let activeSendersCount = 2;
+
+        // Channel Models
+        let channels = [];
+        let workers = [];
+
+        // State Engine Variables
+        let packetsInFlight = [];
+        let activeSelectCase = null;
+        let isRunning = true;
+        let mainSleepingUntil = 0;
+        let intCounter = 0;
+
+        const descriptions = {
+            '3a': "<strong>Question 3a:</strong> Two unbuffered channels (`ints` and `strings`) and no `default` case. The `select` statement blocks waiting for whichever sender produces data next. Because `fastSender` runs every 500ms and `slowSender` every 2000ms, you see ~4 integer receives for every 1 string receive.",
+            '3b': "<strong>Question 3b:</strong> Adds `fasterSender` (sends `[1 2 3]` every 200ms) on a 3rd unbuffered channel `slices`. Outputs show approximately 2-3 slices for every 1 integer, and 10 slices for every 1 string, matching the lab's sample output.",
+            '3c': "<strong>Question 3c:</strong> Adds a `default` case with `time.Sleep(3 * time.Second)`. When `main` reaches `select`, if no senders are actively offering data at that exact millisecond, `main` enters `default` and sleeps for 3s. While `main` is sleeping, all senders block at their channel sends.",
+            '3d': "<strong>Question 3d:</strong> Sets channel buffer capacities to 10 (`make(chan T, 10)`). Now, while `main` sleeps for 3 seconds in `default`, senders continue running and fill the buffers (e.g. `fasterSender` buffers up to 10 slices). Upon waking, `main` drains these ready buffers sequentially."
+        };
+
+        function setupScenarioParams(newMode) {
+            if (newMode === '3a') {
+                bufferCap = 0;
+                hasDefault = false;
+                activeSendersCount = 2;
+
+                channels = [
+                    { id: 'strings', y: 200, color: '#f9e2af', label: 'strings', buffer: [] },
+                    { id: 'ints',    y: 350, color: '#a6e3a1', label: 'ints',    buffer: [] }
+                ];
+
+                workers = [
+                    { id: 'slow', x: 550, y: 150, label: 'go slowSender(strings)', speedMs: 2000, lastTick: 0, isBlocked: false },
+                    { id: 'fast', x: 550, y: 300, label: 'go fastSender(ints)', speedMs: 500, lastTick: 0, isBlocked: false }
+                ];
+            } else {
+                activeSendersCount = 3;
+                channels = [
+                    { id: 'strings', y: 150, color: '#f9e2af', label: 'strings', buffer: [] },
+                    { id: 'ints',    y: 300, color: '#a6e3a1', label: 'ints',    buffer: [] },
+                    { id: 'slices',  y: 450, color: '#89b4fa', label: 'slices',  buffer: [] }
+                ];
+
+                workers = [
+                    { id: 'slow',   x: 550, y: 100, label: 'go slowSender(strings)', speedMs: 2000, lastTick: 0, isBlocked: false },
+                    { id: 'fast',   x: 550, y: 250, label: 'go fastSender(ints)', speedMs: 500, lastTick: 0, isBlocked: false },
+                    { id: 'faster', x: 550, y: 400, label: 'go fasterSender(slices)', speedMs: 200, lastTick: 0, isBlocked: false }
+                ];
+
+                if (newMode === '3b') { bufferCap = 0; hasDefault = false; }
+                else if (newMode === '3c') { bufferCap = 0; hasDefault = true; }
+                else if (newMode === '3d') { bufferCap = 10; hasDefault = true; }
+            }
+        }
+
+        function draw(timestamp) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Main Goroutine Container
+            ctx.strokeStyle = "#89b4fa";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(mainBox.x, mainBox.y, mainBox.w, mainBox.h);
+            ctx.fillStyle = "#89b4fa";
+            ctx.font = "bold 15px sans-serif";
+            ctx.fillText(`${mainBox.label} (${mode.toUpperCase()})`, mainBox.x + 10, mainBox.y - 10);
+
+            // Select Statement Box
+            const isSleeping = timestamp < mainSleepingUntil;
+            ctx.strokeStyle = activeSelectCase ? activeSelectCase.color : (isSleeping ? "#f38ba8" : "#f9e2af");
+            ctx.lineWidth = activeSelectCase || isSleeping ? 3 : 1.5;
+            ctx.strokeRect(selectBox.x, selectBox.y, selectBox.w, selectBox.h);
+
+            ctx.fillStyle = "#f9e2af";
+            ctx.font = "12px monospace";
+            ctx.fillText("select {", selectBox.x + 10, selectBox.y + 25);
+
+            drawCaseText("case s := <-strings:", selectBox.x + 10, selectBox.y + 55, activeSelectCase?.id === 'strings', '#f9e2af');
+            drawCaseText("case i := <-ints:", selectBox.x + 10, selectBox.y + 115, activeSelectCase?.id === 'ints', '#a6e3a1');
+            
+            if (activeSendersCount === 3) {
+                drawCaseText("case s := <-slices:", selectBox.x + 10, selectBox.y + 175, activeSelectCase?.id === 'slices', '#89b4fa');
+            }
+
+            if (hasDefault) {
+                drawCaseText("default:", selectBox.x + 10, selectBox.y + 235, activeSelectCase?.id === 'default', '#f38ba8');
+                drawCaseText("  time.Sleep(3s)", selectBox.x + 10, selectBox.y + 255, activeSelectCase?.id === 'default', '#f38ba8');
+            } else {
+                ctx.fillStyle = "#585b70";
+                ctx.fillText("// Blocking select (No default)", selectBox.x + 10, selectBox.y + 235);
+            }
+
+            ctx.fillStyle = "#f9e2af";
+            ctx.fillText("}", selectBox.x + 10, selectBox.y + 290);
+
+            // Sleeping Overlay
+            if (isSleeping) {
+                const remaining = ((mainSleepingUntil - timestamp) / 1000).toFixed(1);
+                ctx.fillStyle = "#f38ba8";
+                ctx.font = "bold 12px sans-serif";
+                ctx.fillText(`Sleeping... ${remaining}s remaining`, selectBox.x + 15, selectBox.y + 275);
+            }
+
+            // 2. Channels & Buffers
+            channels.forEach(ch => {
+                ctx.strokeStyle = ch.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(530, ch.y);
+                ctx.lineTo(275, ch.y);
+                ctx.stroke();
+
+                ctx.fillStyle = ch.color;
+                ctx.beginPath();
+                ctx.moveTo(275, ch.y);
+                ctx.lineTo(285, ch.y - 5);
+                ctx.lineTo(285, ch.y + 5);
+                ctx.closePath();
+                ctx.fill();
+
+                if (bufferCap > 0) {
+                    // Buffer Queue Display
+                    ctx.fillStyle = "#313244";
+                    ctx.fillRect(340, ch.y - 15, 150, 30);
+                    ctx.strokeStyle = ch.color;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(340, ch.y - 15, 150, 30);
+
+                    for (let i = 1; i < bufferCap; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(340 + i * (150 / bufferCap), ch.y - 15);
+                        ctx.lineTo(340 + i * (150 / bufferCap), ch.y + 15);
+                        ctx.strokeStyle = "#45475a";
+                        ctx.stroke();
+                    }
+
+                    ch.buffer.forEach((item, idx) => {
+                        ctx.fillStyle = ch.color;
+                        ctx.beginPath();
+                        ctx.arc(340 + idx * (150 / bufferCap) + (75 / bufferCap), ch.y, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    ctx.font = "11px monospace";
+                    ctx.fillStyle = ch.color;
+                    ctx.fillText(`${ch.id} (chan, cap=${bufferCap}) [${ch.buffer.length}/${bufferCap}]`, 340, ch.y - 20);
+                } else {
+                    ctx.font = "bold 11px monospace";
+                    ctx.fillStyle = "#f38ba8";
+                    ctx.fillText(`${ch.id} (unbuffered, cap=0)`, 340, ch.y - 10);
+                }
+            });
+
+            // 3. Worker Senders
+            workers.forEach(w => {
+                ctx.strokeStyle = w.isBlocked ? "#f38ba8" : "#cba6f7";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(w.x, w.y - 25, 180, 50);
+                ctx.fillStyle = w.isBlocked ? "#f38ba8" : "#cba6f7";
+                ctx.font = "bold 12px sans-serif";
+                ctx.fillText(w.label, w.x + 8, w.y - 8);
+                ctx.font = "11px monospace";
+                ctx.fillStyle = w.isBlocked ? "#f38ba8" : "#a6adc8";
+                ctx.fillText(w.isBlocked ? "BLOCKED (Sender Waiting)" : `Sleep(${w.speedMs}ms)`, w.x + 8, w.y + 12);
+            });
+
+            // 4. Update Packets in Flight
+            for (let i = packetsInFlight.length - 1; i >= 0; i--) {
+                let p = packetsInFlight[i];
+                p.x += p.vx;
+
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (p.x <= 490) {
+                    const targetChan = channels.find(c => c.id === p.chanId);
+                    if (bufferCap > 0) {
+                        if (targetChan.buffer.length < bufferCap) {
+                            targetChan.buffer.push(p.val);
+                        }
+                        packetsInFlight.splice(i, 1);
+                    } else {
+                        p.x = 285;
+                        p.vx = 0;
+                    }
+                }
+            }
+
+            // 5. System Execution Logic
+            if (isRunning) {
+                // Sender Logic
+                workers.forEach(w => {
+                    if (timestamp - w.lastTick >= w.speedMs) {
+                        let chanId = w.id === 'slow' ? 'strings' : (w.id === 'fast' ? 'ints' : 'slices');
+                        let color = w.id === 'slow' ? '#f9e2af' : (w.id === 'fast' ? '#a6e3a1' : '#89b4fa');
+                        let val = w.id === 'slow' ? "I am the slowSender" : (w.id === 'fast' ? intCounter++ : "[1 2 3]");
+
+                        const targetChan = channels.find(c => c.id === chanId);
+
+                        if (bufferCap > 0) {
+                            if (targetChan.buffer.length < bufferCap) {
+                                w.lastTick = timestamp;
+                                w.isBlocked = false;
+                                packetsInFlight.push({ x: w.x, y: targetChan.y, vx: -8, chanId: chanId, color: color, val: val });
+                            } else {
+                                w.isBlocked = true;
+                            }
+                        } else {
+                            const existing = packetsInFlight.find(p => p.chanId === chanId);
+                            if (!existing) {
+                                w.lastTick = timestamp;
+                                w.isBlocked = false;
+                                packetsInFlight.push({ x: w.x, y: targetChan.y, vx: -8, chanId: chanId, color: color, val: val });
+                            } else {
+                                w.isBlocked = true;
+                            }
+                        }
+                    }
+                });
+
+                // Main Select Evaluation Logic
+                if (timestamp >= mainSleepingUntil && !activeSelectCase) {
+                    evaluateSelect(timestamp);
+                }
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        function drawCaseText(text, x, y, isSelected, activeColor) {
+            ctx.fillStyle = isSelected ? activeColor : "#cdd6f4";
+            ctx.font = isSelected ? "bold 13px monospace" : "12px monospace";
+            ctx.fillText(text, x, y);
+        }
+
+        function evaluateSelect(timestamp) {
+            if (bufferCap > 0) {
+                const availableChans = channels.filter(c => c.buffer.length > 0);
+                if (availableChans.length > 0) {
+                    const chosen = availableChans[Math.floor(Math.random() * availableChans.length)];
+                    const val = chosen.buffer.shift();
+                    triggerReceive(chosen.id, chosen.color, val);
+                } else {
+                    triggerDefault(timestamp);
+                }
+            } else {
+                const readyPackets = packetsInFlight.filter(p => p.x <= 285);
+                if (readyPackets.length > 0) {
+                    const chosenPacket = readyPackets[Math.floor(Math.random() * readyPackets.length)];
+                    const idx = packetsInFlight.indexOf(chosenPacket);
+                    packetsInFlight.splice(idx, 1);
+
+                    const worker = workers.find(w => (w.id === 'slow' && chosenPacket.chanId === 'strings') ||
+                                                    (w.id === 'fast' && chosenPacket.chanId === 'ints') ||
+                                                    (w.id === 'faster' && chosenPacket.chanId === 'slices'));
+                    if (worker) worker.isBlocked = false;
+
+                    triggerReceive(chosenPacket.chanId, chosenPacket.color, chosenPacket.val);
+                } else {
+                    triggerDefault(timestamp);
+                }
+            }
+        }
+
+        function triggerReceive(chanId, color, val) {
+            activeSelectCase = { id: chanId, color: color };
+            if (chanId === 'strings') printTerm(`Received a string ${val}`);
+            if (chanId === 'ints') printTerm(`Received an int ${val}`);
+            if (chanId === 'slices') printTerm(`Received a slice ${val}`);
+
+            setTimeout(() => { activeSelectCase = null; }, 200);
+        }
+
+        function triggerDefault(timestamp) {
+            if (!hasDefault) return;
+
+            activeSelectCase = { id: 'default', color: '#f38ba8' };
+            printTerm("--- Nothing to receive, sleeping for 3s...");
+            mainSleepingUntil = timestamp + 3000;
+            setTimeout(() => { activeSelectCase = null; }, 400);
+        }
+
+        function printTerm(text) {
+            term.innerText += text + "\n";
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function switchScenario(newMode) {
+            mode = newMode;
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            
+            let btnId = `btn${newMode.toUpperCase()}`;
+            const targetBtn = document.getElementById(btnId);
+            if (targetBtn) targetBtn.classList.add('active');
+
+            infoBox.innerHTML = descriptions[newMode];
+            setupScenarioParams(newMode);
+            resetAll();
+        }
+
+        function togglePause() {
+            isRunning = !isRunning;
+        }
+
+        function resetAll() {
+            packetsInFlight = [];
+            activeSelectCase = null;
+            mainSleepingUntil = 0;
+            intCounter = 0;
+            channels.forEach(c => c.buffer = []);
+            workers.forEach(w => { w.lastTick = 0; w.isBlocked = false; });
+            term.innerText = `$ go run select.go (${mode.toUpperCase()})\n`;
+        }
+
+        // Initialize Question 3a View
+        setupScenarioParams('3a');
+        infoBox.innerHTML = descriptions['3a'];
+        requestAnimationFrame(draw);
+    </script>
+</body>
+</html>
