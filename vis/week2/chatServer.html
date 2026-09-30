@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go Chat Server Visualization (3 Clients & Map)</title>
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    h2 { color: #569cd6; margin-bottom: 10px; }
+    .architecture {
+        display: grid;
+        grid-template-columns: 300px 500px 300px;
+        gap: 20px;
+        margin-top: 10px;
+        width: 100%;
+        max-width: 1200px;
+        justify-content: center;
+    }
+    .node-container {
+        background: #252526;
+        border: 2px solid #333;
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: relative;
+    }
+    .client-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .node-title {
+        font-weight: bold;
+        text-align: center;
+        color: #ce9178;
+        font-size: 1.1em;
+        margin-bottom: 5px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 8px;
+    }
+    .component {
+        background: #2d2d30;
+        border: 1px solid #555;
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+        font-size: 0.9em;
+        transition: all 0.3s ease;
+    }
+    .select-block {
+        background: #202020;
+        border: 2px dashed #9cdcfe;
+        border-radius: 8px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .select-title {
+        color: #9cdcfe;
+        font-family: monospace;
+        font-weight: bold;
+        text-align: center;
+        font-size: 1em;
+    }
+    .goroutine { border-left: 4px solid #4ec9b0; }
+    .channel { border-left: 4px solid #dcdcaa; background: #2a2d2a; }
+    .terminal { border-left: 4px solid #569cd6; font-family: monospace; }
+    .data-structure { border-left: 4px solid #c586c0; background: #2d222d; display: flex; flex-direction: column; gap: 8px;}
+    
+    .map-header {
+        font-weight: bold; 
+        border-bottom: 1px solid #555; 
+        padding-bottom: 5px;
+        color: #c586c0;
+    }
+    .map-entries {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .map-row {
+        display: flex;
+        justify-content: space-between;
+        background: #3c2c3c;
+        padding: 5px 10px;
+        border-radius: 4px;
+        border: 1px solid #6c466c;
+        font-family: monospace;
+        font-size: 0.9em;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+    }
+    .map-row.visible { opacity: 1; }
+
+    .active-send {
+        background: #3a3d41;
+        border-color: #569cd6;
+        box-shadow: 0 0 15px rgba(86, 156, 214, 0.6);
+        transform: scale(1.02);
+    }
+    .active-receive {
+        background: #3a3d41;
+        border-color: #4ec9b0;
+        box-shadow: 0 0 15px rgba(78, 201, 176, 0.6);
+        transform: scale(1.02);
+    }
+    .active-channel {
+        background: #3d3d29;
+        border-color: #dcdcaa;
+        box-shadow: 0 0 15px rgba(220, 220, 170, 0.6);
+        transform: scale(1.05);
+    }
+    .active-select {
+        background: #2d3b4a;
+        box-shadow: 0 0 15px rgba(156, 220, 254, 0.6);
+        transform: scale(1.02);
+    }
+    .active-map-row {
+        background: #5a3c5a;
+        box-shadow: 0 0 10px rgba(197, 134, 192, 0.6);
+    }
+
+    .controls {
+        margin: 15px 0;
+        display: flex;
+        gap: 15px;
+    }
+    button {
+        background: #0e639c;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 15px;
+        font-weight: bold;
+    }
+    button:hover { background: #1177bb; }
+    button:disabled { background: #555; cursor: not-allowed; }
+
+    #log {
+        width: 100%;
+        max-width: 1200px;
+        background: #1e1e1e;
+        border: 1px solid #333;
+        padding: 15px;
+        height: 180px;
+        overflow-y: auto;
+        font-family: monospace;
+        color: #9cdcfe;
+        margin-top: 20px;
+        box-sizing: border-box;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+</style>
+</head>
+<body>
+
+<h2>Go Concurrent Chat Server Visualization</h2>
+
+<div class="controls">
+    <button id="btnConnect" onclick="simulateConnections()">1. Connect Clients 2 & 3</button>
+    <button id="btnMessage" onclick="simulateMessage()" disabled>2. Broadcast Message</button>
+</div>
+
+<div class="architecture">
+    <!-- Left Column: Client 1 -->
+    <div class="node-container" id="client1">
+        <div class="node-title">Client 1 (Sender)</div>
+        <div class="component terminal" id="c1-term">Terminal Input (stdin)</div>
+        <div class="grid-2">
+            <div class="component goroutine" id="c1-write">write()</div>
+            <div class="component goroutine" id="c1-read">read()</div>
+        </div>
+    </div>
+
+    <!-- Center Column: Server -->
+    <div class="node-container" id="server">
+        <div class="node-title">Chat Server Node</div>
+        
+        <div class="grid-2">
+            <div class="component goroutine" id="s-accept">acceptConns()</div>
+            <div class="component channel" id="s-conns-chan">conns Channel (Queue)</div>
+        </div>
+
+        <div class="select-block" id="s-select-block">
+            <div class="select-title">main() select multiplexer</div>
+            <div class="grid-2">
+                <div class="component" id="s-case-conns">case conn := &lt;-conns:</div>
+                <div class="component" id="s-case-msgs">case msg := &lt;-msgs:</div>
+            </div>
+            
+            <!-- Map Visualization -->
+            <div class="component data-structure" id="s-clients-map">
+                <div class="map-header">clients map[int]net.Conn</div>
+                <div class="map-entries" id="map-entries">
+                    <div class="map-row visible" id="map-row-0">
+                        <span>Key: 0</span> &rarr; <span>Value: net.Conn (C1)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="component channel" id="s-msgs-chan">msgs Channel (Queue)</div>
+        
+        <div class="grid-3">
+            <div class="component goroutine" id="s-handle-c1">handleClient(0)</div>
+            <div class="component goroutine" id="s-handle-c2" style="opacity: 0.3;">handleClient(1)</div>
+            <div class="component goroutine" id="s-handle-c3" style="opacity: 0.3;">handleClient(2)</div>
+        </div>
+    </div>
+
+    <!-- Right Column: Clients 2 & 3 -->
+    <div class="client-stack">
+        <div class="node-container" id="client2" style="opacity: 0.3;">
+            <div class="node-title">Client 2 (Receiver)</div>
+            <div class="grid-2">
+                <div class="component goroutine" id="c2-write">write()</div>
+                <div class="component goroutine" id="c2-read">read()</div>
+            </div>
+            <div class="component terminal" id="c2-term">Terminal Output</div>
+        </div>
+
+        <div class="node-container" id="client3" style="opacity: 0.3;">
+            <div class="node-title">Client 3 (Receiver)</div>
+            <div class="grid-2">
+                <div class="component goroutine" id="c3-write">write()</div>
+                <div class="component goroutine" id="c3-read">read()</div>
+            </div>
+            <div class="component terminal" id="c3-term">Terminal Output</div>
+        </div>
+    </div>
+</div>
+
+<div id="log"></div>
+
+<script>
+    const logEl = document.getElementById('log');
+    function log(msg) {
+        logEl.innerHTML += `<div>> ${msg}</div>`;
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    async function flash(id, className, duration = 800) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add(className);
+        await sleep(duration);
+        el.classList.remove(className);
+    }
+
+    async function processConnection(clientId, serverHandleId) {
+        document.getElementById(`client${clientId}`).style.opacity = '1';
+        log(`Client ${clientId} connecting to TCP port 8030...`);
+        
+        await flash('s-accept', 'active-receive', 700);
+        log(`Server: acceptConns() generated net.Conn. Pushing to conns Channel...`);
+        
+        await flash('s-conns-chan', 'active-channel', 700);
+        log(`Server: Channel 'conns' unblocks select multiplexer.`);
+        
+        await flash('s-case-conns', 'active-select', 700);
+        log(`Server: 'case conn := <-conns' triggered. Registering net.Conn in clients map.`);
+        
+        // Add new map row dynamically
+        const mapEntries = document.getElementById('map-entries');
+        const newRow = document.createElement('div');
+        newRow.className = 'map-row';
+        newRow.id = `map-row-${clientId-1}`;
+        newRow.innerHTML = `<span>Key: ${clientId-1}</span> &rarr; <span>Value: net.Conn (C${clientId})</span>`;
+        mapEntries.appendChild(newRow);
+        
+        // Trigger reflow to apply CSS transition
+        void newRow.offsetWidth; 
+        newRow.classList.add('visible');
+        await flash(`map-row-${clientId-1}`, 'active-map-row', 1000);
+
+        document.getElementById(serverHandleId).style.opacity = '1';
+        await flash(serverHandleId, 'active-receive', 700);
+        log(`Server: Spawned handleClient(${clientId-1}) goroutine for new client.`);
+    }
+
+    async function simulateConnections() {
+        document.getElementById('btnConnect').disabled = true;
+        log("--- CONNECTION SEQUENCE INITIATED ---");
+        
+        await processConnection(2, 's-handle-c2');
+        await sleep(500);
+        await processConnection(3, 's-handle-c3');
+
+        log("--- ALL CLIENTS CONNECTED ---");
+        document.getElementById('btnMessage').disabled = false;
+    }
+
+    async function simulateMessage() {
+        document.getElementById('btnMessage').disabled = true;
+        log("--- BROADCAST SEQUENCE INITIATED ---");
+
+        log("Client 1: User types message.");
+        await flash('c1-term', 'active-send', 600);
+
+        log("Client 1: write() sends data over TCP.");
+        await flash('c1-write', 'active-send', 600);
+
+        log("Server: handleClient(0) reads connection, builds Message struct, pushes to 'msgs' Channel.");
+        await flash('s-handle-c1', 'active-receive', 600);
+        await flash('s-msgs-chan', 'active-channel', 800);
+
+        log("Server: Channel 'msgs' unblocks select multiplexer.");
+        await flash('s-case-msgs', 'active-select', 800);
+
+        log("Server: Iterating clients map to find recipients (skipping sender ID 0).");
+        await flash('s-clients-map', 'active-select', 800);
+        
+        // Highlight map iteration
+        await flash('map-row-1', 'active-map-row', 400);
+        await flash('map-row-2', 'active-map-row', 400);
+
+        log("Server: Writing to TCP connections for Client 2 and Client 3.");
+        await Promise.all([
+            flash('s-select-block', 'active-send', 800),
+            flash('c2-read', 'active-receive', 800),
+            flash('c3-read', 'active-receive', 800)
+        ]);
+
+        log("Clients 2 & 3: read() goroutines output to terminal.");
+        await Promise.all([
+            flash('c2-term', 'active-receive', 1000),
+            flash('c3-term', 'active-receive', 1000)
+        ]);
+
+        log("--- BROADCAST COMPLETE ---");
+        document.getElementById('btnMessage').disabled = false;
+    }
+</script>
+</body>
+</html>
