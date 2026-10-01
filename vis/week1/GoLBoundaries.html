@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game of Life - Modular Boundary Visualizer</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            max-width: 1000px;
+            justify-content: center;
+        }
+        .grid-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            grid-template-rows: repeat(8, 50px);
+            gap: 2px;
+            background-color: #ccc;
+            border: 2px solid #666;
+            padding: 2px;
+        }
+        .cell {
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #888;
+            transition: all 0.2s ease;
+        }
+        .cell.center {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        .cell.neighbor {
+            background-color: #fef08a;
+            color: #854d0e;
+            font-weight: bold;
+        }
+        .cell.wrapped-neighbor {
+            background-color: #f97316;
+            color: white;
+            font-weight: bold;
+        }
+        .controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            gap: 5px;
+            text-align: center;
+        }
+        button {
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        button:hover { background-color: #d1d5db; }
+        button:active { background-color: #9ca3af; }
+        
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 400px;
+        }
+        .math-block {
+            background: #1e293b;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 15px 0;
+            line-height: 1.5;
+        }
+        .highlight-wrap { color: #f97316; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>2D Array Filter & Modular Boundary Visualizer</h2>
+    <p>Move the blue target cell to the edges to see how modular arithmetic wraps the filter around the grid.</p>
+
+    <div class="container">
+        <div class="grid-wrapper">
+            <div id="grid"></div>
+            
+            <div class="controls">
+                <div></div>
+                <button onclick="move(0, -1)">▲</button>
+                <div></div>
+                <button onclick="move(-1, 0)">◄</button>
+                <button onclick="move(0, 0)">C</button>
+                <button onclick="move(1, 0)">►</button>
+                <div></div>
+                <button onclick="move(0, 1)">▼</button>
+                <div></div>
+            </div>
+            <p><small><i>You can also use your keyboard arrow keys.</i></small></p>
+        </div>
+
+        <div class="panel">
+            <h3>How Modular Arithmetic Works</h3>
+            <p>In C, wrapping around an array of size <code>WIDTH</code> is handled by the modulo operator <code>%</code>.</p>
+            <p><strong>Equation:</strong><br><code>nx = (x + dx + WIDTH) % WIDTH;</code></p>
+            
+            <div id="calculations" class="math-block">
+                <!-- Injected via JS -->
+            </div>
+
+            <ul style="font-size: 14px; padding-left: 20px;">
+                <li><span style="color: #3b82f6; font-weight: bold;">Blue (Target):</span> The current cell <code>(x, y)</code></li>
+                <li><span style="color: #ca8a04; font-weight: bold;">Yellow:</span> Standard neighbors.</li>
+                <li><span style="color: #f97316; font-weight: bold;">Orange:</span> Neighbors wrapping across the boundary.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const W = 8;
+        const H = 8;
+        let cx = 1;
+        let cy = 1;
+
+        function initGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${x}-${y}`;
+                    cell.innerText = `${x},${y}`;
+                    grid.appendChild(cell);
+                }
+            }
+            updateHighlight();
+        }
+
+        function move(dx, dy) {
+            // Move the center cell itself using modular arithmetic so it loops!
+            cx = (cx + dx + W) % W;
+            cy = (cy + dy + H) % H;
+            updateHighlight();
+        }
+
+        function updateHighlight() {
+            // Reset all cells
+            document.querySelectorAll('.cell').forEach(c => {
+                c.className = 'cell';
+            });
+
+            // Highlight center
+            const center = document.getElementById(`cell-${cx}-${cy}`);
+            if (center) center.classList.add('center');
+
+            let calcHTML = `Target Cell: (x=${cx}, y=${cy})<br>WIDTH=${W}, HEIGHT=${H}<br><br>`;
+            calcHTML += `Calculating 8 neighbors:<br>----------------------<br>`;
+
+            // Highlight 8 neighbors
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+
+                    // The Core Mathematical Formula for boundaries
+                    let rawX = cx + dx;
+                    let rawY = cy + dy;
+                    let nx = (rawX + W) % W;
+                    let ny = (rawY + H) % H;
+
+                    const neighbor = document.getElementById(`cell-${nx}-${ny}`);
+                    let isWrapped = (rawX < 0 || rawX >= W || rawY < 0 || rawY >= H);
+
+                    if (neighbor) {
+                        neighbor.classList.add(isWrapped ? 'wrapped-neighbor' : 'neighbor');
+                    }
+
+                    // Logging the math for educational purposes
+                    if (isWrapped) {
+                        calcHTML += `<span class="highlight-wrap">nx = (${rawX} + ${W}) % ${W} = ${nx}</span><br>`;
+                        calcHTML += `<span class="highlight-wrap">ny = (${rawY} + ${H}) % ${H} = ${ny}</span><br>`;
+                        calcHTML += `<br>`;
+                    }
+                }
+            }
+            
+            let wraps = document.querySelectorAll('.wrapped-neighbor').length;
+            if(wraps === 0) {
+                calcHTML += `No boundaries crossed.<br>Standard direct array access.`;
+            }
+
+            document.getElementById('calculations').innerHTML = calcHTML;
+        }
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') { move(0, -1); e.preventDefault(); }
+            if (e.key === 'ArrowDown') { move(0, 1); e.preventDefault(); }
+            if (e.key === 'ArrowLeft') { move(-1, 0); e.preventDefault(); }
+            if (e.key === 'ArrowRight') { move(1, 0); e.preventDefault(); }
+        });
+
+        // Start
+        initGrid();
+    </script>
+</body>
+</html>
