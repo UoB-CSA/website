@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dining Philosophers Animation</title>
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+    header {
+        background-color: #4a3b5c;
+        color: white;
+        text-align: center;
+        padding: 15px;
+        font-size: 24px;
+    }
+    .container {
+        display: flex;
+        flex: 1;
+        background: white;
+        margin: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .text-panel {
+        width: 35%;
+        padding: 30px;
+        background-color: #fff;
+        border-right: 2px solid #eee;
+        display: flex;
+        flex-direction: column;
+    }
+    .info-box {
+        background-color: #faebd7;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        font-size: 14px;
+    }
+    .info-box p {
+        margin: 5px 0;
+    }
+    .controls {
+        padding: 15px;
+        background: #e8f4f8;
+        border-radius: 5px;
+        margin-bottom: 15px;
+    }
+    select, button {
+        padding: 10px;
+        font-size: 14px;
+        margin-top: 10px;
+        width: 100%;
+        cursor: pointer;
+    }
+    .button-group {
+        display: flex;
+        gap: 10px;
+    }
+    .status-legend {
+        margin-bottom: 15px;
+        font-size: 14px;
+    }
+    .status-legend span {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 3px;
+        color: white;
+        margin-right: 5px;
+    }
+    #commentary-box {
+        flex: 1;
+        background: #222;
+        color: #0f0;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        overflow-y: auto;
+        font-size: 13px;
+        max-height: 250px;
+    }
+    #commentary-box p {
+        margin: 3px 0;
+        border-bottom: 1px solid #333;
+        padding-bottom: 3px;
+    }
+    .canvas-panel {
+        width: 65%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        background: white;
+    }
+    canvas {
+        background-color: transparent;
+    }
+</style>
+</head>
+<body>
+
+<header>The Dining Philosophers</header>
+
+<div class="container">
+    <div class="text-panel">
+        <div class="info-box">
+            <p>Five philosophers (with free will ☺) are eating or thinking.</p>
+            <p>While eating, they are not thinking. While thinking, they are not eating.</p>
+            <p>Each must pick up 2 forks one after the other to eat.</p>
+        </div>
+        
+        <div class="controls">
+            <label for="algorithm"><strong>Select Solution:</strong></label>
+            <select id="algorithm">
+                <option value="naive">Naive Strategy (Causes Deadlock)</option>
+                <option value="naive-simult">Naive (Simultaneous Deadlock)</option>
+                <option value="dijkstra" selected>Dijkstra's (Resource Hierarchy)</option>
+                <option value="dijkstra-simult">Dijkstra's (Simultaneous Edge Case)</option>
+                <option value="waiter">Waiter (Arbitrator)</option>
+            </select>
+            <div class="button-group">
+                <button id="stepBtn">Step (Manual)</button>
+                <button id="autoBtn">Auto-Step (Slow)</button>
+            </div>
+            <button id="resetBtn" style="background:#fcc; border:1px solid #c00;">Reset Table</button>
+        </div>
+
+        <div class="status-legend">
+            <strong>State:</strong><br><br>
+            <span style="background: #888;">Thinking</span>
+            <span style="background: #e69500;">Hungry (Waiting)</span>
+            <span style="background: #2ca02c;">Eating</span>
+        </div>
+
+        <strong>Live Commentary:</strong>
+        <div id="commentary-box"></div>
+    </div>
+
+    <div class="canvas-panel">
+        <canvas id="simCanvas" width="700" height="700"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const stepBtn = document.getElementById('stepBtn');
+    const autoBtn = document.getElementById('autoBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const algoSelect = document.getElementById('algorithm');
+    const commentaryBox = document.getElementById('commentary-box');
+
+    const centerX = 350;
+    const centerY = 350;
+    const tableRadius = 180;
+    const philosopherRadius = 280;
+    const plateRadius = 25;
+    const names = ["Aristotle", "Confucius", "Socrates", "Voltaire", "Descartes"];
+    
+    let philosophers = [];
+    let forks = [null, null, null, null, null]; 
+    let currentAlgorithm = 'dijkstra'; 
+    let autoInterval = null;
+
+    function log(message, color="#0f0") {
+        const p = document.createElement('p');
+        p.style.color = color;
+        p.textContent = message;
+        commentaryBox.appendChild(p);
+        commentaryBox.scrollTop = commentaryBox.scrollHeight;
+    }
+
+    class Philosopher {
+        constructor(id, name, startTicks) {
+            this.id = id;
+            this.name = name;
+            this.state = 0; // 0: Thinking, 1: Hungry, 2: 1 Fork, 3: Eating
+            this.eatTicks = 0;
+            this.thinkTicks = startTicks; 
+            
+            this.angle = (id * 2 * Math.PI / 5) - Math.PI / 2; 
+            this.x = centerX + philosopherRadius * Math.cos(this.angle);
+            this.y = centerY + philosopherRadius * Math.sin(this.angle);
+            
+            this.plateX = centerX + (tableRadius * 0.65) * Math.cos(this.angle);
+            this.plateY = centerY + (tableRadius * 0.65) * Math.sin(this.angle);
+            
+            this.leftFork = id;
+            this.rightFork = (id + 4) % 5; 
+            
+            this.forksHeld = [];
+        }
+
+        evaluate() {
+            if (this.state === 0) { 
+                this.thinkTicks--;
+                if (this.thinkTicks <= 0) {
+                    this.state = 1;
+                    log(`${this.name} stopped thinking and is now Hungry.`);
+                }
+            } 
+            else if (this.state === 3) { 
+                this.eatTicks--;
+                if (this.eatTicks <= 0) {
+                    this.releaseForks();
+                    this.state = 0;
+                    this.thinkTicks = Math.floor(Math.random() * 4) + 2;
+                    log(`${this.name} finished eating, put down forks, and is Thinking.`, "#0ff");
+                }
+            }
+            else if (this.state === 1 || this.state === 2) {
+                if (currentAlgorithm.includes('naive')) this.tryAcquireNaive();
+                else if (currentAlgorithm.includes('dijkstra')) this.tryAcquireDijkstra();
+                else if (currentAlgorithm.includes('waiter')) this.tryAcquireWaiter();
+            }
+        }
+
+        tryAcquireNaive() {
+            if (this.state === 1) { 
+                if (forks[this.leftFork] === null) {
+                    forks[this.leftFork] = this.id;
+                    this.forksHeld.push(this.leftFork);
+                    this.state = 2;
+                    log(`${this.name} picked up left fork ${this.leftFork + 1}.`);
+                } else {
+                    log(`${this.name} is waiting for left fork ${this.leftFork + 1} (held by ${names[forks[this.leftFork]]}).`, "#ffaa00");
+                }
+            } else if (this.state === 2) { 
+                if (forks[this.rightFork] === null) {
+                    forks[this.rightFork] = this.id;
+                    this.forksHeld.push(this.rightFork);
+                    this.state = 3;
+                    this.eatTicks = 3;
+                    log(`${this.name} picked up right fork ${this.rightFork + 1} and is now EATING!`, "#ff0");
+                } else {
+                    log(`${this.name} has left fork ${this.leftFork + 1}, waiting for right fork ${this.rightFork + 1}...`, "#ff5555");
+                }
+            }
+        }
+
+        tryAcquireDijkstra() {
+            let firstF = Math.min(this.leftFork, this.rightFork);
+            let secondF = Math.max(this.leftFork, this.rightFork);
+            
+            if (this.state === 1) { 
+                if (forks[firstF] === null) {
+                    forks[firstF] = this.id;
+                    this.forksHeld.push(firstF);
+                    this.state = 2;
+                    log(`${this.name} picked up LOWER fork ${firstF + 1}.`);
+                } else {
+                    log(`${this.name} wants LOWER fork ${firstF + 1}, but it's in use.`, "#ffaa00");
+                }
+            } else if (this.state === 2) {
+                if (forks[secondF] === null) {
+                    forks[secondF] = this.id;
+                    this.forksHeld.push(secondF);
+                    this.state = 3;
+                    this.eatTicks = 3;
+                    log(`${this.name} picked up HIGHER fork ${secondF + 1} and is EATING!`, "#ff0");
+                } else {
+                    log(`${this.name} holds lower fork ${firstF + 1}, waiting for HIGHER fork ${secondF + 1}.`, "#ffaa00");
+                }
+            }
+        }
+
+        tryAcquireWaiter() {
+            if (this.state === 1) {
+                if (forks[this.leftFork] === null && forks[this.rightFork] === null) {
+                    forks[this.leftFork] = this.id;
+                    forks[this.rightFork] = this.id;
+                    this.forksHeld = [this.leftFork, this.rightFork];
+                    this.state = 3;
+                    this.eatTicks = 3;
+                    log(`Waiter gives forks ${this.leftFork + 1} & ${this.rightFork + 1} to ${this.name}. EATING!`, "#ff0");
+                } else {
+                    log(`${this.name} asked Waiter, but forks are unavailable. Waiting.`, "#ffaa00");
+                }
+            }
+        }
+
+        releaseForks() {
+            this.forksHeld.forEach(f => forks[f] = null);
+            this.forksHeld = [];
+        }
+
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 45, 0, 2 * Math.PI);
+            
+            if (this.state === 0) ctx.fillStyle = '#888'; 
+            else if (this.state === 1 || this.state === 2) ctx.fillStyle = '#e69500'; 
+            else if (this.state === 3) ctx.fillStyle = '#2ca02c'; 
+            
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#333';
+            ctx.stroke();
+
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.name, this.x, this.y + 65);
+            
+            ctx.beginPath();
+            ctx.arc(this.plateX, this.plateY, plateRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#1a3b8c'; 
+            ctx.fill();
+            
+            if (this.state !== 0) {
+                ctx.beginPath();
+                ctx.arc(this.plateX, this.plateY, 15, 0, 2 * Math.PI);
+                ctx.fillStyle = '#eee';
+                ctx.fill();
+            }
+        }
+    }
+
+    function init() {
+        philosophers = [];
+        forks = [null, null, null, null, null];
+        commentaryBox.innerHTML = '';
+        log(`--- Initialized: ${algoSelect.options[algoSelect.selectedIndex].text} ---`, "#fff");
+        
+        let isSimultaneous = currentAlgorithm.includes('simult');
+
+        for (let i = 0; i < 5; i++) {
+            // In simultaneous modes, force everyone to get hungry exactly at tick 1
+            let startTicks = isSimultaneous ? 1 : Math.floor(Math.random() * 3) + 1;
+            philosophers.push(new Philosopher(i, names[i], startTicks));
+        }
+        drawFrame();
+    }
+
+    function drawTable() {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, tableRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = '#d2a679'; 
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#8b5a2b';
+        ctx.stroke();
+    }
+
+    function drawForks() {
+        // 1. Draw resting position indicators (Larger, faded red footprints)
+        for (let i = 0; i < 5; i++) {
+            let angle = (i * 2 * Math.PI / 5) - Math.PI / 2 + (Math.PI / 5);
+            let restX = centerX + (tableRadius * 0.65) * Math.cos(angle);
+            let restY = centerY + (tableRadius * 0.65) * Math.sin(angle);
+            
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; 
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText((i + 1).toString(), restX, restY + 5);
+        }
+
+        // 2. Draw actual forks (either on table or next to philosopher)
+        for (let i = 0; i < 5; i++) {
+            let angle = (i * 2 * Math.PI / 5) - Math.PI / 2 + (Math.PI / 5);
+            
+            let forkX = centerX + (tableRadius * 0.65) * Math.cos(angle);
+            let forkY = centerY + (tableRadius * 0.65) * Math.sin(angle);
+            let drawAngle = angle;
+            let isHeld = (forks[i] !== null);
+            
+            if (isHeld) {
+                let owner = philosophers[forks[i]];
+                let isLeftFork = (i === owner.leftFork);
+                
+                let offsetAngle = isLeftFork ? owner.angle + 0.6 : owner.angle - 0.6;
+                let holdDistance = 65; 
+                
+                forkX = owner.x + holdDistance * Math.cos(offsetAngle);
+                forkY = owner.y + holdDistance * Math.sin(offsetAngle);
+                drawAngle = owner.angle + Math.PI; 
+            }
+
+            ctx.save();
+            ctx.translate(forkX, forkY);
+            ctx.rotate(drawAngle + Math.PI/2);
+            
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-2, -15, 4, 30);
+            ctx.beginPath();
+            ctx.moveTo(-6, -15);
+            ctx.lineTo(6, -15);
+            ctx.lineTo(4, -25);
+            ctx.lineTo(-4, -25);
+            ctx.fill();
+            ctx.restore();
+
+            // Active number moves with the fork (Larger, solid red)
+            ctx.fillStyle = '#ff0000'; 
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText((i + 1).toString(), forkX, forkY + 5);
+        }
+    }
+
+    function drawWaiter() {
+        if (currentAlgorithm.includes('waiter')) {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText("WAITER", centerX, centerY + 5);
+        }
+    }
+
+    function drawFrame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawTable();
+        philosophers.forEach(p => p.draw());
+        drawForks();
+        drawWaiter();
+    }
+
+    function executeStep() {
+        let isSimultaneous = currentAlgorithm.includes('simult');
+        
+        // If simultaneous, process in strict order so P4 misses out as expected.
+        // If not, shuffle order to simulate realistic random asynchronous timing.
+        let order = [0, 1, 2, 3, 4];
+        if (!isSimultaneous) {
+            order = order.sort(() => Math.random() - 0.5);
+        }
+        
+        let actionTaken = false;
+        for (let idx of order) {
+            let p = philosophers[idx];
+            let oldState = p.state;
+            let oldForks = p.forksHeld.length;
+            
+            p.evaluate();
+            
+            if (p.state !== oldState || p.forksHeld.length !== oldForks) {
+                actionTaken = true;
+                // In non-simultaneous mode, break after one action to watch it turn-by-turn
+                // In simultaneous mode, do NOT break so everyone acts on the same "tick"
+                if (!isSimultaneous) {
+                    break; 
+                }
+            }
+        }
+
+        if (currentAlgorithm.includes('naive')) {
+            let isDeadlock = philosophers.every(p => p.state === 2);
+            if (isDeadlock) {
+                log("DEADLOCK REACHED! Everyone holds a left fork and waits forever.", "#f00");
+                if (autoInterval) clearInterval(autoInterval);
+            }
+        }
+
+        drawFrame();
+    }
+
+    stepBtn.addEventListener('click', () => {
+        executeStep();
+    });
+
+    autoBtn.addEventListener('click', () => {
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            autoBtn.textContent = "Auto-Step (Slow)";
+        } else {
+            autoInterval = setInterval(executeStep, 1000);
+            autoBtn.textContent = "Stop Auto-Step";
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            autoBtn.textContent = "Auto-Step (Slow)";
+        }
+        init();
+    });
+
+    algoSelect.addEventListener('change', () => {
+        currentAlgorithm = algoSelect.value;
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            autoBtn.textContent = "Auto-Step (Slow)";
+        }
+        init(); 
+    });
+
+    init();
+</script>
+</body>
+</html>
