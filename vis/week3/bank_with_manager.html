@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manager Strategy - Accurate Queue State</title>
+<style>
+    body { font-family: sans-serif; display: flex; gap: 20px; padding: 20px; background: #f8f9fa; margin: 0; height: 100vh; box-sizing: border-box;}
+    .panel { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column;}
+    .grid-container { position: relative; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; position: relative; z-index: 1; }
+    .account { border: 2px solid #333; padding: 20px 10px; text-align: center; border-radius: 5px; font-weight: bold; transition: 0.3s; background: #fff; }
+    .locked { background: #ffcccc; border-color: red; }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    
+    .queues-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; flex: 1; overflow-y: auto;}
+    .queue-box { border: 2px dashed #ccc; padding: 10px; border-radius: 6px; background: #fafafa; }
+    .queue-box h3 { margin: 0 0 10px 0; font-size: 14px; color: #333; }
+    .queue-box.manager { border-color: #007bff; background: #e9f5ff; }
+    .queue-box.executor { border-color: #28a745; background: #e9ffe9; }
+    
+    .tx-pill { display: inline-block; padding: 4px 8px; margin: 2px; border-radius: 4px; font-size: 12px; font-family: monospace; background: #333; color: white;}
+    .tx-pill.mgr { background: #007bff; }
+    .tx-pill.exc { background: #28a745; }
+
+    .log { flex: 1; overflow-y: auto; background: #222; color: #0f0; padding: 10px; font-family: monospace; font-size: 13px; border-radius: 6px;}
+    .controls { display: flex; gap: 10px; margin-top: 15px;}
+    button { flex: 1; padding: 12px; font-size: 16px; cursor: pointer; color: white; border: none; border-radius: 4px; font-weight: bold; }
+    .btn-step { background: #ffc107; color: #333; }
+    .btn-step:hover { background: #e0a800; }
+    .btn-auto { background: #28a745; }
+    .btn-auto:hover { background: #218838; }
+    .btn-auto:disabled { background: #6c757d; cursor: not-allowed; }
+</style>
+</head>
+<body>
+    <div class="panel">
+        <h2 style="margin-top:0;">Bank Accounts (Manager Lock)</h2>
+        <div class="grid-container" id="grid-container">
+            <canvas id="canvas"></canvas>
+            <div class="grid">
+                <div id="acc-0" class="account">A (0)<br><span style="font-weight: normal; font-size: 12px;">Unlocked</span></div>
+                <div id="acc-1" class="account">B (1)<br><span style="font-weight: normal; font-size: 12px;">Unlocked</span></div>
+                <div id="acc-2" class="account">C (2)<br><span style="font-weight: normal; font-size: 12px;">Unlocked</span></div>
+                <div id="acc-3" class="account">D (3)<br><span style="font-weight: normal; font-size: 12px;">Unlocked</span></div>
+                <div id="acc-4" class="account">E (4)<br><span style="font-weight: normal; font-size: 12px;">Unlocked</span></div>
+                <div id="acc-5" class="account">F (5)<br><span style="font-weight: normal; font-size: 12px;">Unlocked</span></div>
+            </div>
+        </div>
+        
+        <div class="queues-container">
+            <div class="queue-box">
+                <h3>1. Initial Transaction Queue (main)</h3>
+                <div id="q-initial">Empty</div>
+            </div>
+            <div class="queue-box manager">
+                <h3>2. Waiting Transactions (Manager List)</h3>
+                <div id="q-waiting">Empty</div>
+            </div>
+            <div class="queue-box executor">
+                <h3>3. Internal Queue (Executors Channel)</h3>
+                <div id="q-internal">Empty</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="stepScenario()" class="btn-step">Step (Manual)</button>
+            <button onclick="startAuto()" class="btn-auto" id="autoBtn">Run (Auto)</button>
+        </div>
+    </div>
+    <div class="panel">
+        <h2 style="margin-top:0;">System Log</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+<script>
+    const logEl = document.getElementById('log');
+    
+    // Core state arrays representing the structures in main_manager_2.go
+    let transactionQueue = [];
+    let waitingTransactions = [];
+    let internalQueue = [];
+    
+    let accountsState = {0: false, 1: false, 2: false, 3: false, 4: false, 5: false};
+    let activeLines = [];
+    
+    // Tick System for stepping
+    let stepResolvers = [];
+    let started = false;
+    let autoInterval = null;
+
+    function waitForTick() {
+        return new Promise(resolve => stepResolvers.push(resolve));
+    }
+
+    function triggerTick() {
+        const currentQueue = stepResolvers;
+        stepResolvers = [];
+        currentQueue.forEach(r => r());
+    }
+
+    function initScenario() {
+        started = true;
+        log("--- Generated 20 Random Transactions into Main Queue ---");
+        log("Press Step to start the Manager goroutine.");
+        for (let i = 0; i < 20; i++) {
+            let from = Math.floor(Math.random() * 6);
+            let to = Math.floor(Math.random() * 6);
+            while (from === to) {
+                to = Math.floor(Math.random() * 6);
+            }
+            transactionQueue.push({from: from, to: to, id: i});
+        }
+        updateQueuesDisplay();
+        processManager(); 
+    }
+
+    function stepScenario() {
+        if (!started) initScenario();
+        else triggerTick();
+    }
+
+    function startAuto() {
+        if (!started) initScenario();
+        document.getElementById('autoBtn').disabled = true;
+        triggerTick();
+        autoInterval = setInterval(() => {
+            if (stepResolvers.length > 0) triggerTick();
+            else clearInterval(autoInterval);
+        }, 1000); 
+    }
+
+    function log(msg) { 
+        logEl.innerHTML += `<div>${msg}</div>`; 
+        logEl.scrollTop = logEl.scrollHeight; 
+    }
+    
+    function setLockUI(id, locked, entity) {
+        accountsState[id] = locked;
+        const el = document.getElementById(`acc-${id}`);
+        if (locked) {
+            el.classList.add('locked');
+            el.querySelector('span').innerText = `Locked by ${entity}`;
+        } else {
+            el.classList.remove('locked');
+            el.querySelector('span').innerText = `Unlocked`;
+        }
+    }
+
+    function formatTx(t, typeClass) {
+        return `<span class="tx-pill ${typeClass}">Tx${t.id}: ${t.from}&rarr;${t.to}</span>`;
+    }
+
+    function updateQueuesDisplay() {
+        document.getElementById('q-initial').innerHTML = transactionQueue.length === 0 ? "Empty" : transactionQueue.map(t => formatTx(t, '')).join(' ');
+        document.getElementById('q-waiting').innerHTML = waitingTransactions.length === 0 ? "Empty" : waitingTransactions.map(t => formatTx(t, 'mgr')).join(' ');
+        document.getElementById('q-internal').innerHTML = internalQueue.length === 0 ? "Empty" : internalQueue.map(t => formatTx(t, 'exc')).join(' ');
+    }
+
+    function drawLines() {
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('grid-container');
+        
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        activeLines.forEach(line => {
+            const el1 = document.getElementById(`acc-${line.from}`);
+            const el2 = document.getElementById(`acc-${line.to}`);
+            const rect1 = el1.getBoundingClientRect();
+            const rect2 = el2.getBoundingClientRect();
+            const contRect = container.getBoundingClientRect();
+            
+            const x1 = rect1.left - contRect.left + rect1.width / 2;
+            const y1 = rect1.top - contRect.top + rect1.height / 2;
+            const x2 = rect2.left - contRect.left + rect2.width / 2;
+            const y2 = rect2.top - contRect.top + rect2.height / 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = 'rgba(40, 167, 69, 0.7)';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const headlen = 15;
+            const arrowX = x2 - Math.cos(angle) * 30; 
+            const arrowY = y2 - Math.sin(angle) * 30;
+
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - headlen * Math.cos(angle - Math.PI / 6), arrowY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(arrowX - headlen * Math.cos(angle + Math.PI / 6), arrowY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.fillStyle = 'rgba(40, 167, 69, 0.9)';
+            ctx.fill();
+        });
+    }
+
+    window.addEventListener('resize', drawLines);
+
+    async function processManager() {
+        await waitForTick(); 
+        
+        // Step 1: Manager initialization loop (range transactionQueue)
+        log("Manager: Draining Initial Queue into Waiting List...");
+        while (transactionQueue.length > 0) {
+            waitingTransactions.push(transactionQueue.shift());
+        }
+        updateQueuesDisplay();
+        
+        await waitForTick(); 
+
+        // Step 2: Main Manager loop (waitingTransactions.Len() > 0)
+        while(waitingTransactions.length > 0 || internalQueue.length > 0) {
+            let dispatchedAny = false;
+            
+            if (waitingTransactions.length > 0) {
+                let i = 0;
+                while (i < waitingTransactions.length) {
+                    let t = waitingTransactions[i];
+                    if (!accountsState[t.from] && !accountsState[t.to]) {
+                        log(`<span style="color:#ffcc00">Manager: Accounts free. Locking ${t.from} & ${t.to} for Tx ${t.id}</span>`);
+                        setLockUI(t.from, true, "Manager");
+                        setLockUI(t.to, true, "Manager");
+                        
+                        // Remove from waiting list, add to executors channel
+                        waitingTransactions.splice(i, 1);
+                        internalQueue.push(t);
+                        updateQueuesDisplay();
+                        
+                        executeTransaction(t);
+                        dispatchedAny = true;
+                    } else {
+                        i++; 
+                    }
+                }
+                
+                if (!dispatchedAny && waitingTransactions.length > 0) {
+                    log(`<span style="color:#aaa">Manager: Scanned waiting list. Resources busy... waiting for an executor to finish (<-done).</span>`);
+                }
+            }
+            
+            await waitForTick(); // Simulates blocking on <-done channel
+        }
+        log("Manager Queue Empty and all Execs finished.");
+    }
+
+    async function executeTransaction(t) {
+        const lineObj = {from: t.from, to: t.to};
+        activeLines.push(lineObj);
+        drawLines();
+
+        log(`<strong>Exec handling Tx ${t.id}: transferring funds ${t.from} -> ${t.to}</strong>`);
+        
+        // Wait one tick to simulate executor processing time (bank.execute)
+        await waitForTick();
+        
+        log(`<span style="color:#00ffcc">Exec completed Tx ${t.id}. Unlocking ${t.from} & ${t.to}</span>`);
+        setLockUI(t.from, false, `Exec`);
+        setLockUI(t.to, false, `Exec`);
+
+        // Remove from internal queue as it is now finished
+        internalQueue = internalQueue.filter(item => item.id !== t.id);
+        updateQueuesDisplay();
+
+        activeLines = activeLines.filter(l => l !== lineObj);
+        drawLines();
+    }
+</script>
+</body>
+</html>
