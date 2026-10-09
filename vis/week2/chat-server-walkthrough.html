@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Building a chat server with goroutines and channels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#EBF0F3; --panel:#FFFFFF; --ink:#12232C; --muted:#50646E; --line:#C4D1D8; --soft:#DFE8EC;
+  --accent:#0A6B7E; --accent-ink:#FFFFFF; --warn:#B3202A; --ok:#1E7B46;
+  --chan:#B26A00; --mapc:#6A4BC0;
+  --code-bg:#0E2430; --code-ink:#DBE9EF; --grid:rgba(18,35,44,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B161C; --panel:#12242E; --ink:#E3EDF1; --muted:#92A7B1; --line:#284350; --soft:#1A313D;
+    --accent:#52C4DA; --accent-ink:#06222B; --warn:#FF8089; --ok:#6FD39A;
+    --chan:#E9B949; --mapc:#A894F0;
+    --code-bg:#08141A; --code-ink:#DBE9EF; --grid:rgba(227,237,241,.07);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B161C; --panel:#12242E; --ink:#E3EDF1; --muted:#92A7B1; --line:#284350; --soft:#1A313D;
+  --accent:#52C4DA; --accent-ink:#06222B; --warn:#FF8089; --ok:#6FD39A;
+  --chan:#E9B949; --mapc:#A894F0;
+  --code-bg:#08141A; --code-ink:#DBE9EF; --grid:rgba(227,237,241,.07);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+h1,h2,h3{font-family:'Bricolage Grotesque','Instrument Sans',system-ui,sans-serif;line-height:1.15;margin:0}
+h1{font-size:clamp(1.9rem,4.4vw,3rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.01em;margin-bottom:.4rem}
+h3{font-size:1.05rem;font-weight:600;margin-bottom:.35rem}
+p{margin:.5rem 0}
+code,.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.86em}
+p code,li code,td code,.note code,.status code,summary code{background:var(--soft);padding:.08em .35em;border-radius:4px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.head{max-width:1180px;margin:0 auto;padding:34px 20px 18px}
+.head p{max-width:66ch;color:var(--muted);font-size:1.05rem;margin-top:.7rem}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);gap:30px;max-width:1180px;margin:0 auto;padding:0 20px 70px;align-items:start}
+.rail{position:sticky;top:calc(14px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:22px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;border-left:2px solid var(--line)}
+.steps button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:baseline;padding:8px 10px 8px 14px;margin-left:-2px;border-left:2px solid transparent;width:100%;color:var(--muted);font-weight:500}
+.steps button .n{font-family:'JetBrains Mono',monospace;font-size:.8rem;min-width:1.1em}
+.steps button:hover{color:var(--ink)}
+.steps button[aria-current="step"]{color:var(--ink);border-left-color:var(--accent);font-weight:600;background:linear-gradient(90deg,var(--soft),transparent)}
+.steps button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.legend{font-size:.86rem;color:var(--muted)}
+.legend div{display:flex;align-items:center;gap:8px;margin:4px 0}
+.lg{display:inline-block;width:22px;height:14px;border-radius:4px;border:2.5px solid}
+
+.step{display:none}
+.step.on{display:block}
+.lede{font-size:1.08rem;color:var(--muted);max-width:70ch}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin-top:20px;align-items:start}
+.cols.wide-right{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.stack>*+*{margin-top:16px}
+.full{margin-top:20px}
+
+pre.code{background:var(--code-bg);color:var(--code-ink);font:13px/1.65 'JetBrains Mono',ui-monospace,monospace;padding:12px 0;border-radius:8px;overflow-x:auto;margin:0}
+.ln{display:block;padding:0 14px 0 11px;white-space:pre;border-left:3px solid transparent}
+.ln.has{cursor:pointer;border-left-color:#52C4DA}
+.ln.has:hover{background:rgba(82,196,218,.1)}
+.ln.sel{background:rgba(82,196,218,.22)}
+.k{color:#7FD1E6}.s{color:#A8DDA9}.c{color:#7F98A5;font-style:italic}.t{color:#E8C27A}.a{color:#FFAB70}
+.note{margin-top:10px;font-size:.95rem;border-left:3px solid var(--accent);padding:6px 12px;background:var(--soft);border-radius:0 6px 6px 0;min-height:3.3em}
+.note b{font-weight:600}
+.tap{font-size:.82rem;color:var(--muted);margin:6px 0 0}
+
+.fig{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background-color:var(--panel);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:16px 16px}
+.figcap{font-size:.86rem;color:var(--muted);margin:6px 0 0}
+.big{font-family:'JetBrains Mono',monospace;font-size:.92rem;background:var(--soft);padding:8px 12px;border-radius:6px;overflow-x:auto;white-space:nowrap}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0}
+.btn{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 13px;font-weight:500}
+.btn:hover:not([disabled]){border-color:var(--accent)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{padding:3px 10px;font-size:.88rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:5px 11px;font-size:.9rem}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+select{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.chk{display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:.95rem}
+.chk input{margin-top:.28em;accent-color:var(--accent)}
+.status{font-size:.95rem;min-height:2.4em}
+.bad{color:var(--warn);font-weight:600}
+.good{color:var(--ok);font-weight:600}
+.pager{display:flex;justify-content:space-between;gap:10px;margin-top:30px;padding-top:16px;border-top:1px solid var(--line)}
+.pager .btn[disabled]{visibility:hidden}
+details{border-top:1px solid var(--line);padding:10px 0}
+details summary{cursor:pointer;font-weight:600}
+details p{color:var(--muted)}
+ul.tight{margin:.4rem 0;padding-left:1.2rem}
+ul.tight li{margin:.25rem 0}
+a.jump{color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px;background:none;border:0;padding:0;font:inherit}
+.cast{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:baseline;font-size:.95rem}
+.cast .lg{margin-top:3px}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:5px 8px;text-align:center;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--muted)}
+td.w{background:var(--soft);font-weight:600}
+
+/* simulation */
+.simsvg text{font-family:'Instrument Sans',system-ui,sans-serif}
+.simsvg .t1{font-size:14px;font-weight:600;fill:var(--ink)}
+.simsvg .t2{font-size:11.5px;fill:var(--muted);font-family:'JetBrains Mono',monospace}
+.simsvg .tm{font-size:11px;fill:var(--ink);font-family:'JetBrains Mono',monospace}
+.simsvg .ta{font-size:11.5px;fill:var(--accent);font-family:'JetBrains Mono',monospace}
+.simsvg .tw{font-size:11px;fill:var(--warn);font-family:'JetBrains Mono',monospace;font-weight:600}
+.simsvg .bx{fill:var(--panel);stroke-width:1.8}
+.simsvg .gor{stroke:var(--accent)}
+.simsvg .chn{stroke:var(--chan);fill:var(--panel);stroke-width:2}
+.simsvg .mp{stroke:var(--mapc);fill:var(--panel);stroke-width:2}
+.simsvg .hot{stroke-width:4;fill:var(--soft)}
+.simsvg .bus{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 3}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.slot{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:8px;padding:10px}
+.slot header{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.slot .nm{font-weight:600}
+.chip{font-size:.74rem;padding:1px 8px;border-radius:99px;background:var(--soft);color:var(--muted)}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+pre.term{background:var(--code-bg);color:var(--code-ink);font:12px/1.5 'JetBrains Mono',monospace;padding:8px;border-radius:6px;height:104px;overflow:auto;margin:8px 0 0;white-space:pre-wrap;word-break:break-word}
+.term .me{color:#7F98A5}.term .rx{color:#A8DDA9}
+.send{display:flex;gap:6px;margin-top:8px}
+.send input,.in{flex:1;min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.simbar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;margin:10px 0 0;font-size:.92rem}
+.lane{border:1px solid var(--line);border-left:5px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--panel)}
+.lane.run{border-left-color:var(--accent)}
+.lane.dead{opacity:.55}
+.lane b{display:block}
+.lane span{font-size:.9rem;color:var(--muted)}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:14px}
+  .rail{position:static;gap:14px}
+  .steps{flex-direction:row;overflow-x:auto;border-left:0;border-bottom:2px solid var(--line)}
+  .steps button{width:auto;white-space:nowrap;border-left:0;border-bottom:2px solid transparent;margin:0 0 -2px;padding:8px 12px}
+  .steps button[aria-current="step"]{border-bottom-color:var(--accent);background:none}
+  .cols,.cols.wide-right{grid-template-columns:minmax(0,1fr)}
+  .cards{grid-template-columns:minmax(0,1fr)}
+  .legend{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="head">
+  <h1>From empty functions to a working chat server</h1>
+  <p>Seven steps that build the Go chat system from the skeleton: a client that listens and types at the same time, and a server made of goroutines, two channels and one map of connections. The server diagram is a live simulation. Connect clients, send messages, and watch every value move.</p>
+</header>
+
+<div class="shell">
+  <aside class="rail">
+    <nav aria-label="Steps"><ol class="steps" id="steps"></ol></nav>
+    <div class="legend" aria-label="Colour key">
+      <div><span class="lg" style="border-color:var(--accent)"></span>goroutine</div>
+      <div><span class="lg" style="border-color:var(--chan)"></span>channel</div>
+      <div><span class="lg" style="border-color:var(--mapc)"></span>shared data (the map)</div>
+    </div>
+  </aside>
+
+  <main id="stage">
+
+  <!-- 1 -->
+  <section class="step" id="s0" aria-labelledby="h0">
+    <h2 id="h0">The brief</h2>
+    <p class="lede">Many clients talk through one server. The server must listen for new clients, read what each one types, and pass every message to everyone except the sender. The client must type and listen at the same time.</p>
+    <div class="cols">
+      <div class="panel">
+        <h3>The server skeleton, <span class="mono">main()</span></h3>
+        <pre class="code" id="code0"></pre>
+        <div class="note" id="note0"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="stack">
+        <div class="panel">
+          <h3>The cast</h3>
+          <div class="cast">
+            <span class="lg" style="border-color:var(--accent)"></span><span><b>Goroutines.</b> <code>main</code> on the server, <code>acceptConns</code>, and one <code>handleClient</code> per client. On the client, <code>main</code> plus <code>read</code>.</span>
+            <span class="lg" style="border-color:var(--chan)"></span><span><b>Channels.</b> <code>conns</code> carries new connections and <code>msgs</code> carries chat messages, both towards the server's <code>main</code>.</span>
+            <span class="lg" style="border-color:var(--mapc)"></span><span><b>The list of connections.</b> <code>clients</code>, a <code>map[int]net.Conn</code> from client ID to connection.</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Where we're going</h3>
+          <ul class="tight">
+            <li><button class="jump" data-go="1">The client</button>: why it needs two goroutines</li>
+            <li><button class="jump" data-go="2">Accepting connections</button>: <code>acceptConns</code>, the <code>conns</code> channel and the map</li>
+            <li><button class="jump" data-go="3">A goroutine per client</button>: <code>handleClient</code> and the <code>msgs</code> channel</li>
+            <li><button class="jump" data-go="4">Broadcasting</button>: the <code>select</code> loop</li>
+            <li><button class="jump" data-go="5">Try the whole system</button> with three clients</li>
+          </ul>
+          <p>To test your own code, run <code>go run server.go</code> in one terminal and <code>go run client.go</code> in two others.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="step" id="s1" aria-labelledby="h1">
+    <h2 id="h1">The client: two jobs at once</h2>
+    <p class="lede">Reading from the keyboard blocks until you press Enter. Reading from the server blocks until a line arrives. One goroutine can only be stuck in one of those at a time, so the client uses two.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code1"></pre>
+        <div class="note" id="note1"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Try both designs</h3>
+        <div class="seg" id="m2" role="group" aria-label="Client design">
+          <button type="button" data-m="one" aria-pressed="false">One loop</button>
+          <button type="button" data-m="two" aria-pressed="true">Two goroutines</button>
+        </div>
+        <div class="stack" style="margin-top:12px">
+          <div class="lane" id="laneA"><b></b><span></span></div>
+          <div class="lane" id="laneB"><b></b><span></span></div>
+        </div>
+        <pre class="term" id="term2" aria-live="polite" style="height:130px"></pre>
+        <div class="send">
+          <input id="in2" placeholder="type a message, or /quit" aria-label="Your message">
+          <button class="btn pri sm" id="send2">Send</button>
+        </div>
+        <div class="row" style="margin-bottom:4px">
+          <button class="btn sm" id="push2">Server delivers a message from Bob</button>
+          <button class="btn sm" id="restart2">Restart client</button>
+        </div>
+        <div class="status" id="st2"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step" id="s2" aria-labelledby="h2x">
+    <h2 id="h2x">Accepting connections</h2>
+    <p class="lede">The server listens on a port. <code>ln.Accept()</code> blocks until someone connects, so a dedicated goroutine, <code>acceptConns</code>, does that forever and passes each new connection through the <code>conns</code> channel to <code>main</code>. Main adds it to the <code>clients</code> map.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code2"></pre>
+        <div class="note" id="note2"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <div id="sim2"></div>
+      </div>
+    </div>
+    <div class="panel full">
+      <h3>Why a map and an ID counter, not a plain list?</h3>
+      <p>Each <code>handleClient</code> goroutine remembers the ID it was started with. That ID must keep pointing at the same client for the whole life of the server. Remove a client and see what happens in each design.</p>
+      <div class="row" style="margin-top:6px">
+        <div class="seg" id="mode2b" role="group" aria-label="Storage design">
+          <button type="button" data-m="slice" aria-pressed="true">Slice, ID is the position</button>
+          <button type="button" data-m="map" aria-pressed="false">Map, ID is a key</button>
+        </div>
+        <button class="btn sm" id="rmA">Remove Alice</button>
+        <button class="btn sm" id="rmB">Remove Bob</button>
+        <button class="btn sm" id="rst2b">Reset</button>
+      </div>
+      <div class="cols" style="margin-top:6px;align-items:start">
+        <table id="tab2b"></table>
+        <div>
+          <div class="row" style="margin-top:0" id="snd2b"></div>
+          <div class="status" id="st2b"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step" id="s3" aria-labelledby="h3x">
+    <h2 id="h3x">A goroutine for each client</h2>
+    <p class="lede">Reading a line from a client blocks until that client types something. If main did the reading, one quiet client would freeze everyone. So each client gets its own <code>handleClient</code> goroutine, and they all send what they read into the same <code>msgs</code> channel.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code3"></pre>
+        <div class="note" id="note3"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <div id="sim3"></div>
+      </div>
+    </div>
+    <p class="figcap" style="margin-top:12px">Both channels are unbuffered. A sender waits until <code>main</code> is back at its <code>select</code>, and the diagram shows waiting senders as dots in the pipe. Send from two clients quickly to see them queue up.</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="step" id="s4" aria-labelledby="h4x">
+    <h2 id="h4x">Broadcasting from the select loop</h2>
+    <p class="lede">Main's <code>select</code> waits for whichever channel is ready, then runs that case to completion. For a message, it walks the <code>clients</code> map and writes to every connection except the sender's.</p>
+    <div class="cols">
+      <div class="stack">
+        <div class="panel">
+          <pre class="code" id="code4"></pre>
+          <div class="note" id="note4"></div>
+          <p class="tap">Tap a marked line.</p>
+        </div>
+        <div class="panel">
+          <h3>Who touches what?</h3>
+          <table id="own4"></table>
+          <p class="figcap">Only <code>main</code> reads or writes <code>clients</code> and <code>n</code>. New connections and messages reach it through channels, one case at a time, so no lock is needed.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div id="sim4"></div>
+      </div>
+    </div>
+    <div class="panel full">
+      <details open style="border-top:0;padding-top:0">
+        <summary>What if <code>handleClient</code> also added itself to the map?</summary>
+        <p>Then two goroutines could write to the map while main is ranging over it. Go's runtime detects this and crashes the program with <code>fatal error: concurrent map writes</code> (or reads and writes). You'd need a <code>sync.Mutex</code> around every access. Funnelling everything through channels into one goroutine avoids the problem entirely.</p>
+      </details>
+      <details>
+        <summary>Why does the delivery order change from message to message?</summary>
+        <p>Ranging over a Go map visits entries in a deliberately randomised order. The simulation shuffles the visit order for each message to show this. It doesn't matter for a chat room, but you can't rely on it.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="step" id="s5" aria-labelledby="h5x">
+    <h2 id="h5x">Try the whole system</h2>
+    <p class="lede">Three clients, one server, everything wired together. Connect a few clients, type into their boxes, and watch the messages travel.</p>
+    <div class="panel">
+      <div id="sim5"></div>
+    </div>
+    <div class="cols full">
+      <div class="panel">
+        <h3>Things to try</h3>
+        <ul class="tight">
+          <li>Connect Alice and Bob. Send from Alice. Only Bob sees it.</li>
+          <li>Connect Cara and send from Bob. Alice and Cara both see it, in a varying order.</li>
+          <li>Disconnect Bob, then send from Alice. The server still tries to write to Bob.</li>
+          <li>Tick the extension box and repeat the last step.</li>
+          <li>Set the speed to Slow and send from two clients at once to see the queue at <code>msgs</code>.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>What the disconnect shows</h3>
+        <p>When a client quits, its <code>handleClient</code> gets an error from <code>ReadString</code> and exits. The skeleton solution never tells <code>main</code>, so the dead connection stays in the map and every later broadcast writes to it. The write error is ignored, so nothing breaks, but the entry is never cleaned up. The extension box shows one fix: have the exiting goroutine report to <code>main</code>, which deletes the entry.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="step" id="s6" aria-labelledby="h6x">
+    <h2 id="h6x">Whole solution and gotchas</h2>
+    <p class="lede">The complete working code, followed by the sharp edges worth knowing about.</p>
+    <div class="cols">
+      <div class="panel">
+        <div class="seg" id="tab7" role="group" aria-label="File" style="margin-bottom:10px">
+          <button type="button" data-f="server" aria-pressed="true">server.go</button>
+          <button type="button" data-f="client" aria-pressed="false">client.go</button>
+        </div>
+        <pre class="code" id="code6"></pre>
+        <div class="note" id="note6"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Gotchas</h3>
+        <details open>
+          <summary>The message is used as a format string</summary>
+          <p>Both programs call <code>fmt.Fprintf(conn, text)</code>, so any <code>%</code> in a chat message is treated as a formatting verb. Try it:</p>
+          <input class="in" id="fmt7" value="I'm 100% sure, 50%d off" aria-label="Chat message to format" style="width:100%">
+          <p style="margin-bottom:2px"><code>Fprintf(conn, text)</code> sends:</p>
+          <div class="big" id="fa7"></div>
+          <p style="margin-bottom:2px"><code>Fprint(conn, text)</code> sends:</p>
+          <div class="big" id="fb7"></div>
+          <p>Use <code>fmt.Fprint</code> or <code>io.WriteString</code> when the text isn't a format.</p>
+        </details>
+        <details>
+          <summary>Closed clients stay in the map</summary>
+          <p>Step 6 shows it. Every broadcast keeps writing to dead connections, and the map grows for the life of the server. Fix it by telling <code>main</code> when a <code>handleClient</code> exits and calling <code>delete(clients, id)</code>.</p>
+        </details>
+        <details>
+          <summary>The client spins when the server goes away</summary>
+          <p><code>read</code> ignores the error from <code>ReadString</code>. After the server closes the connection, every call returns immediately with an error and an empty string, so the loop prints <code>::</code> as fast as it can.</p>
+          <div class="row"><button class="btn sm" id="spin7">Server closes the connection</button><span class="mono" id="spinout7"></span></div>
+          <p>Check <code>err</code> and <code>return</code> when it isn't nil.</p>
+        </details>
+        <details>
+          <summary>Errors that are only printed</summary>
+          <p><code>handleError</code> just prints. If <code>net.Listen</code> fails, <code>ln</code> is nil and <code>acceptConns</code> then crashes on the first <code>Accept</code>. On the client, if <code>net.Dial</code> fails, <code>conn</code> is nil and the first read crashes. Exiting on a startup error is usually better.</p>
+        </details>
+        <details>
+          <summary>One slow client can stall everyone</summary>
+          <p>All the writes happen inside main's <code>select</code> case. A client whose connection stops accepting data would block that write and, with it, every other client's messages. A common fix is a writer goroutine and a channel per client.</p>
+        </details>
+        <details>
+          <summary>Small things</summary>
+          <p>The <code>/quit</code> check compares with <code>"/quit\n"</code>, which won't match on a terminal that sends <code>\r\n</code>. Messages keep their trailing newline, which is why the client's <code>Println</code> leaves a blank line. <code>net.Conn</code> is already an interface, so passing <code>*net.Conn</code> is unnecessary.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <div class="pager">
+    <button class="btn" id="back">Back</button>
+    <button class="btn pri" id="fwd">Next</button>
+  </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STEPS=["The brief","The client","Accepting connections","A goroutine per client","Broadcasting","Try the whole system","Whole solution"];
+const NAMES=['Alice','Bob','Cara'];
+const SCOL=['hsl(8,78%,52%)','hsl(212,76%,52%)','hsl(300,45%,52%)'];
+const SAMPLES=['hi everyone','anyone there?','lunch at 12?','back in 5','100% sure','sounds good'];
+let sampleN=0;
+
+/* ---------- code blocks ---------- */
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const HLRE=/(\/\/.*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(func|for|go|if|else|var|range|return|make|append|chan|package|import|select|case|type|struct|map|break|delete)\b|\b(uint8|int|string|error)\b|(&lt;-)/g;
+const hl=s=>esc(s).replace(HLRE,(m,c,st,k,t,a)=>c?`<span class="c">${c}</span>`:st?`<span class="s">${st}</span>`:k?`<span class="k">${k}</span>`:t?`<span class="t">${t}</span>`:`<span class="a">${a}</span>`);
+function codeBlock(preId,noteId,lines){
+  const pre=$('#'+preId),note=$('#'+noteId);pre.innerHTML='';const els=[];
+  lines.forEach(([txt,n])=>{
+    const d=document.createElement('span');d.className='ln';d.innerHTML=hl(txt)||' ';
+    if(n){d.classList.add('has');d.tabIndex=0;d.setAttribute('role','button');
+      const pick=()=>{els.forEach(e=>e.classList.remove('sel'));d.classList.add('sel');note.innerHTML=n};
+      d.addEventListener('click',pick);
+      d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}});
+      d._pick=pick;
+    }
+    pre.appendChild(d);els.push(d);
+  });
+  const first=els.find(e=>e._pick);if(first)first._pick();
+}
+
+/* ====================== SIMULATION OF THE SERVER ====================== */
+const CY=[120,235,350];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const wrap=(t,n)=>{const out=[];let cur='';t.split(' ').forEach(w=>{if((cur+' '+w).trim().length>n){out.push(cur);cur=w}else cur=(cur+' '+w).trim()});if(cur)out.push(cur);return out};
+
+class Sim{
+  constructor(root,o){
+    this.root=root;this.o=Object.assign({layer:3,term:true,pre:false,ext:false},o);this.L=this.o.layer;
+    this.dead=false;this.ext=false;
+    root.innerHTML=this.html();
+    this.dyn=$('.g-dyn',root);this.dots=$('.g-dots',root);this.spd=$('.spd',root);
+    this.entries=[];this.n=0;this.q=[];this.busy=false;this.cur=null;
+    this.act=['waiting in select'];this.hot=new Set();this.rowHot=null;this.vis=null;this.fx=[];
+    this.cl=[0,1,2].map(()=>({state:'off',id:null,lines:[]}));
+    this.hc=['none','none','none'];this.hcId=[null,null,null];
+    if(this.o.pre){for(let s=0;s<3;s++){this.entries.push({id:s,slot:s,closed:false});this.cl[s].state='on';this.cl[s].id=s;this.hc[s]='live';this.hcId[s]=s}this.n=3}
+    const box=$('.sim',root);
+    box.addEventListener('click',e=>{
+      const b=e.target.closest('button[data-act]');if(!b)return;
+      const card=b.closest('.slot');const s=+card.dataset.s;
+      if(b.dataset.act==='conn'){this.cl[s].state==='on'?this.disconnect(s):this.connect(s)}
+      if(b.dataset.act==='send'){const inp=$('input',card);let t=inp.value.trim();if(!t)t=SAMPLES[sampleN++%SAMPLES.length];inp.value='';this.send(s,t)}
+    });
+    box.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.send input'))e.target.closest('.slot').querySelector('[data-act="send"]').click()});
+    const ex=$('.extchk',root);if(ex)ex.addEventListener('change',()=>{this.ext=ex.checked});
+    $('.rst',root).addEventListener('click',()=>{this.dead=true;activeSims.push(new Sim(root,this.o))});
+    this.render();
+  }
+  destroy(){this.dead=true}
+  html(){
+    const L=this.L,o=this.o;
+    const card=s=>`<div class="slot" style="--c:${SCOL[s]}" data-s="${s}"><header><span class="nm">${NAMES[s]}</span><span class="chip">offline</span><button class="btn sm cbtn" data-act="conn">Connect</button></header>`+
+      (L>=2?`<div class="send"><input placeholder="${SAMPLES[s]}" aria-label="Message from ${NAMES[s]}"><button class="btn sm sbtn" data-act="send">Send</button></div>`:'')+
+      (L>=3&&o.term?`<pre class="term" aria-label="${NAMES[s]}'s screen"></pre>`:'')+`</div>`;
+    let bus='';
+    for(let s=0;s<3;s++){
+      bus+=`<polyline class="bus" points="130,${CY[s]-26} 195,${CY[s]-26}"/>`;
+      if(L>=2)bus+=`<polyline class="bus" points="130,${CY[s]-8} 235,${CY[s]-8}"/><polyline class="bus" points="355,${CY[s]} 385,${CY[s]}"/>`;
+      if(L>=3)bus+=`<polyline class="bus" points="165,${CY[s]+16} 130,${CY[s]+16}"/>`;
+    }
+    bus+=`<polyline class="bus" points="195,${CY[2]-26} 195,38 225,38"/><polyline class="bus" points="375,38 410,38"/><polyline class="bus" points="540,38 685,38 685,110"/>`;
+    if(L>=2)bus+=`<polyline class="bus" points="385,${CY[0]} 385,235 410,235"/><polyline class="bus" points="385,${CY[2]} 385,235"/><polyline class="bus" points="540,235 590,235"/>`;
+    if(L>=3)bus+=`<polyline class="bus" points="685,330 685,430 165,430 165,${CY[0]+16}"/>`;
+    let stat=`<rect x="225" y="18" width="150" height="40" rx="8" class="bx gor"/><text class="t1" x="235" y="35">acceptConns</text><text class="t2" x="235" y="50">ln.Accept()</text>`;
+    stat+=`<rect x="410" y="20" width="130" height="36" rx="18" class="chn"/><text class="t2" x="412" y="14">conns  chan net.Conn</text>`;
+    if(L>=2)stat+=`<rect x="410" y="217" width="130" height="36" rx="18" class="chn"/><text class="t2" x="412" y="211">msgs  chan Message</text>`;
+    stat+=`<rect class="main bx gor" x="590" y="110" width="190" height="220" rx="10"/><text class="t1" x="602" y="132">main goroutine</text><text class="tm" x="602" y="156">for { select {</text>`;
+    stat+=`<rect class="rowc" x="596" y="164" width="178" height="24" rx="5" fill="none"/><text class="tm" x="604" y="180">case conn := &lt;-conns</text>`;
+    if(L>=2)stat+=`<rect class="rowm" x="596" y="194" width="178" height="24" rx="5" fill="none"/><text class="tm" x="604" y="210">case msg := &lt;-msgs</text>`;
+    stat+=`<rect x="795" y="110" width="120" height="262" rx="10" class="mp"/><text class="t1" x="805" y="132">clients</text><text class="t2" x="805" y="147">map[int]net.Conn</text>`;
+    const extra=o.ext?`<label class="chk"><input type="checkbox" class="extchk"><span>Extension: remove a client from the map when it disconnects</span></label>`:'';
+    return `<div class="sim"><div class="fig"><svg viewBox="0 0 920 470" class="simsvg" role="img" aria-label="Diagram of clients, server goroutines, channels and the clients map" style="display:block;width:100%;height:auto">
+<rect x="205" y="4" width="711" height="462" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="6 4"/>
+<text class="t2" x="10" y="20">clients</text><text class="t2" x="218" y="458">server.go</text>
+<g>${bus}</g><g>${stat}</g><g class="g-dyn"></g><g class="g-dots"></g></svg></div>
+<div class="simbar"><label>Speed <select class="spd"><option value="0.2">Slow</option><option value="0.45" selected>Normal</option><option value="1.2">Fast</option></select></label><button class="btn sm rst">Reset</button>${extra}</div>
+<div class="status simst" style="margin-top:8px"></div>
+<div class="cards">${[0,1,2].map(card).join('')}</div></div>`;
+  }
+  sp(){return +this.spd.value}
+  sleep(ms){return new Promise(r=>setTimeout(r,this.dead?0:(RM?40:ms*0.45/this.sp())))}
+  dot(path,color,label){
+    return new Promise(res=>{
+      if(this.dead||RM){res();return}
+      let len=0;const seg=[];
+      for(let i=1;i<path.length;i++){const d=Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]);seg.push(d);len+=d}
+      const dur=Math.max(120,len/this.sp());
+      const NS='http://www.w3.org/2000/svg';
+      const g=document.createElementNS(NS,'g');
+      const c=document.createElementNS(NS,'circle');c.setAttribute('r',7);c.setAttribute('fill',color);c.setAttribute('stroke','#fff');c.setAttribute('stroke-width',1.5);
+      g.appendChild(c);
+      if(label){const t=document.createElementNS(NS,'text');t.setAttribute('class','tm');t.setAttribute('x',10);t.setAttribute('y',-8);t.textContent=label;g.appendChild(t)}
+      this.dots.appendChild(g);
+      const t0=performance.now();
+      const tick=now=>{
+        const f=Math.min(1,(now-t0)/dur);let dist=f*len,i=0;
+        while(i<seg.length-1&&dist>seg[i]){dist-=seg[i];i++}
+        const p=path[i],q=path[i+1],r=seg[i]?dist/seg[i]:1;
+        g.setAttribute('transform',`translate(${p[0]+(q[0]-p[0])*r},${p[1]+(q[1]-p[1])*r})`);
+        if(f<1&&!this.dead)requestAnimationFrame(tick);else{g.remove();res()}
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+  say(t){this.act=wrap(t,25);this.render()}
+  term(s,kind,text){this.cl[s].lines.push({kind,text});this.render()}
+  async flash(key,ms){this.hot.add(key);this.render();await this.sleep(ms);this.hot.delete(key);this.render()}
+
+  async connect(s){
+    const c=this.cl[s];if(c.state!=='off')return;
+    c.state='dialing';this.render();
+    await this.dot([[130,CY[s]-26],[195,CY[s]-26],[195,38],[225,38]],SCOL[s]);
+    await this.flash('acc',300);
+    await this.dot([[375,38],[410,38]],SCOL[s]);
+    this.q.push({t:'conn',slot:s});this.render();this.pump();
+  }
+  async send(s,text){
+    const c=this.cl[s];if(c.state!=='on'||this.L<2)return;
+    this.term(s,'me',text);
+    await this.dot([[130,CY[s]-8],[235,CY[s]-8]],SCOL[s],text.slice(0,12));
+    await this.flash('hc'+s,250);
+    await this.dot([[355,CY[s]],[385,CY[s]],[385,235],[410,235]],SCOL[s]);
+    this.q.push({t:'msg',slot:s,id:c.id,text});this.render();this.pump();
+  }
+  async disconnect(s){
+    const c=this.cl[s];if(c.state!=='on')return;
+    c.state='off';const id=c.id;c.id=null;this.render();
+    if(this.L>=2&&this.hc[s]==='live'){await this.dot([[130,CY[s]+4],[235,CY[s]+4]],'#888','close')}
+    const e=this.entries.find(e=>e.id===id);if(e)e.closed=true;
+    if(this.L>=2&&this.hc[s]==='live'){this.hc[s]='exited';await this.flash('hc'+s,350)}
+    this.render();
+    if(this.ext&&this.L>=3){this.q.push({t:'gone',id,slot:s});this.render();this.pump()}
+  }
+  async pump(){
+    if(this.busy)return;this.busy=true;
+    while(this.q.length&&!this.dead){
+      const ev=this.q.shift();this.cur=ev;this.hot.add('main');this.render();
+      if(ev.t==='conn')await this.onConn(ev);
+      else if(ev.t==='msg')await this.onMsg(ev);
+      else await this.onGone(ev);
+      this.cur=null;this.rowHot=null;this.hot.delete('main');
+    }
+    this.busy=false;this.act=['waiting in select'];this.render();
+  }
+  async onConn(ev){
+    const s=ev.slot;this.rowHot='conn';
+    this.say('case conn := <-conns: main takes the new connection');
+    await this.dot([[540,38],[685,38],[685,110]],SCOL[s]);
+    const id=this.n;
+    this.say(`clients[${id}] = conn`);
+    await this.dot([[780,170],[795,170]],SCOL[s]);
+    this.entries.push({id,slot:s,closed:false});this.n++;
+    this.cl[s].state='on';this.cl[s].id=id;this.render();
+    await this.sleep(350);
+    if(this.L>=2){
+      this.say(`go handleClient(conn, ${id}, msgs)`);
+      this.hc[s]='live';this.hcId[s]=id;await this.flash('hc'+s,500);
+    }
+    this.say(`n++  (n is now ${this.n})`);await this.sleep(350);
+  }
+  async onMsg(ev){
+    this.rowHot='msg';
+    this.say(`case msg := <-msgs: message from client ${ev.id}`);
+    await this.dot([[540,235],[590,235]],SCOL[ev.slot],ev.text.slice(0,12));
+    if(this.L<3){this.say('main now has the message. Step 5 sends it on to the other clients.');await this.sleep(1300);return}
+    this.say('for i, client := range clients');await this.sleep(300);
+    for(const e of shuffle(this.entries)){
+      this.vis=e.id;this.render();
+      if(e.id===ev.id){this.say(`i = ${e.id} is the sender: skip`);await this.sleep(550);continue}
+      this.say(`i = ${e.id}: write to client ${e.id}`);
+      await this.dot([[685,330],[685,430],[165,430],[165,CY[e.slot]+16],[130,CY[e.slot]+16]],SCOL[ev.slot],ev.text.slice(0,12));
+      if(e.closed){
+        this.fx.push({slot:e.slot});this.render();
+        this.say(`write to closed client ${e.id} fails. The error is ignored`);
+        await this.sleep(700);this.fx=[];
+      }else this.term(e.slot,'rx',ev.text);
+    }
+    this.vis=null;this.render();
+  }
+  async onGone(ev){
+    this.say(`delete(clients, ${ev.id})`);await this.sleep(500);
+    this.entries=this.entries.filter(e=>e.id!==ev.id);this.render();await this.sleep(300);
+  }
+
+  render(){
+    if(!this.dyn)return;
+    const L=this.L;let d='';
+    const root=this.root;
+    const rc=$('.rowc',root),rm=$('.rowm',root),mn=$('.main',root);
+    if(rc){rc.setAttribute('fill',this.rowHot==='conn'?'var(--soft)':'none');rc.setAttribute('stroke',this.rowHot==='conn'?'var(--accent)':'none');rc.setAttribute('stroke-width',2)}
+    if(rm){rm.setAttribute('fill',this.rowHot==='msg'?'var(--soft)':'none');rm.setAttribute('stroke',this.rowHot==='msg'?'var(--accent)':'none');rm.setAttribute('stroke-width',2)}
+    if(mn)mn.setAttribute('class','main bx gor'+(this.hot.has('main')?' hot':''));
+    for(let s=0;s<3;s++){
+      const c=this.cl[s],hot=this.hot.has('cl'+s);
+      d+=`<rect x="10" y="${CY[s]-35}" width="120" height="70" rx="10" class="bx${hot?' hot':''}" style="stroke:${SCOL[s]}"/>`;
+      d+=`<text class="t1" x="22" y="${CY[s]-12}">${NAMES[s]}</text>`;
+      d+=`<text class="t2" x="22" y="${CY[s]+6}">${c.state==='off'?'offline':c.state==='dialing'?'dialing…':'connected'}</text>`;
+      if(L>=2&&c.state==='on')d+=`<text class="t2" x="22" y="${CY[s]+23}">main + go read</text>`;
+      if(this.L>=2&&this.hc[s]!=='none'){
+        const ex=this.hc[s]==='exited';
+        d+=`<rect x="235" y="${CY[s]-23}" width="120" height="46" rx="8" class="bx gor${this.hot.has('hc'+s)?' hot':''}" ${ex?'stroke-dasharray="4 3" opacity=".6"':''}/>`;
+        d+=`<text class="t1" x="245" y="${CY[s]-4}">handleClient</text><text class="t2" x="245" y="${CY[s]+13}">${ex?'exited: EOF':'clientid = '+this.hcId[s]}</text>`;
+      }
+    }
+    if(this.hot.has('acc'))d+=`<rect x="225" y="18" width="150" height="40" rx="8" class="bx gor hot"/><text class="t1" x="235" y="35">acceptConns</text><text class="t2" x="235" y="50">ln.Accept()</text>`;
+    // waiting senders
+    const qc=this.q.filter(e=>e.t==='conn'),qm=this.q.filter(e=>e.t==='msg');
+    qc.slice(0,6).forEach((e,k)=>{d+=`<circle cx="${428+k*18}" cy="38" r="6.5" fill="${SCOL[e.slot]}" stroke="var(--chan)"/>`});
+    if(L>=2)qm.slice(0,6).forEach((e,k)=>{d+=`<circle cx="${428+k*18}" cy="235" r="6.5" fill="${SCOL[e.slot]}" stroke="var(--chan)"/>`});
+    if(qc.length)d+=`<text class="tw" x="225" y="76">sender waits: conns &lt;- conn</text>`;
+    if(L>=2)new Set(qm.map(e=>e.slot)).forEach(s=>{d+=`<text class="tw" x="235" y="${CY[s]+40}">waits: msgs &lt;- m</text>`});
+    // main action log
+    this.act.slice(-6).forEach((t,i)=>{d+=`<text class="ta" x="602" y="${244+i*15}">${esc(t)}</text>`});
+    // map rows
+    this.entries.slice(0,8).forEach((e,i)=>{
+      const y=156+i*24,vis=this.vis===e.id;
+      d+=`<rect x="803" y="${y}" width="104" height="21" rx="5" fill="${vis?'var(--soft)':'none'}" stroke="${vis?'var(--accent)':SCOL[e.slot]}" stroke-width="${vis?2.5:1.3}" ${e.closed?'stroke-dasharray="3 2"':''}/>`;
+      d+=`<text class="tm" x="811" y="${y+15}" ${e.closed?'opacity=".55"':''}>${e.id}: conn${e.closed?' (dead)':''}</text>`;
+    });
+    if(this.entries.length>8)d+=`<text class="t2" x="811" y="352">+${this.entries.length-8} more</text>`;
+    d+=`<text class="t2" x="805" y="366">n = ${this.n}</text>`;
+    this.fx.forEach(f=>{d+=`<text class="tw" x="134" y="${CY[f.slot]+36}">✕ write failed</text>`});
+    this.dyn.innerHTML=d;
+    // status line
+    const live=this.hc.filter(h=>h==='live').length;
+    const st=$('.simst',root);
+    if(st)st.innerHTML=L>=2?`Goroutines running on the server: <b>${2+live}</b> (main, acceptConns and ${live} handleClient). <code>len(clients)</code> = ${this.entries.length}.`
+      :`Goroutines running on the server: <b>2</b> (main and acceptConns). <code>len(clients)</code> = ${this.entries.length}.`;
+    // cards
+    $$('.slot',root).forEach(card=>{
+      const s=+card.dataset.s,c=this.cl[s];
+      const chip=$('.chip',card);chip.textContent=c.state==='off'?'offline':c.state==='dialing'?'connecting':'connected, id '+c.id;chip.classList.toggle('on',c.state==='on');
+      const cb=$('.cbtn',card);cb.textContent=c.state==='on'?'Disconnect':c.state==='dialing'?'Connecting':'Connect';cb.disabled=c.state==='dialing';
+      const inp=$('.send input',card),sb=$('.sbtn',card);
+      if(inp){inp.disabled=c.state!=='on';sb.disabled=c.state!=='on'}
+      const t=$('.term',card);
+      if(t){t.innerHTML=c.lines.map(l=>l.kind==='me'?`<span class="me">&gt; ${esc(l.text)}</span>`:`<span class="rx">:: ${esc(l.text)}</span>`).join('\n');t.scrollTop=t.scrollHeight}
+    });
+  }
+}
+let activeSims=[];
+function makeSim(id,o){const s=new Sim($('#'+id),o);activeSims.push(s);return s}
+
+/* ====================== STEP 2: CLIENT DEMO ====================== */
+const D={mode:'two',phase:'stdin',inbox:[],lines:[],alive:true,pushN:0};
+const PUSHES=['hi!','are you there?','lunch at 12?','back in 5'];
+function demoReset(){D.phase='stdin';D.inbox=[];D.lines=[];D.alive=true;D.pushN=0;$('#in2').value='';demoRender()}
+function demoAdd(kind,text){D.lines.push({kind,text})}
+function demoRender(){
+  const two=D.mode==='two';
+  $$('#m2 button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===D.mode)));
+  const A=$('#laneA'),B=$('#laneB');
+  $('b',A).textContent=two?'main goroutine: write()':'main goroutine: one loop';
+  let a;
+  if(!D.alive)a='exited';
+  else if(two)a='blocked in ReadString on stdin, waiting for you to press Enter';
+  else a=D.phase==='stdin'?'blocked on stdin, waiting for you to press Enter':'blocked on the socket, waiting for the server to send a line';
+  $('span',A).textContent=a;A.className='lane'+(D.alive?' run':' dead');
+  $('b',B).textContent=two?'go read()':'(no second goroutine)';
+  $('span',B).textContent=two?(D.alive?'blocked in ReadString on the socket, wakes as soon as a line arrives':'killed when main returned'):'nothing is watching the socket while the loop waits on stdin';
+  B.className='lane'+(two&&D.alive?' run':' dead');
+  const lock=!D.alive||(!two&&D.phase==='conn');
+  $('#in2').disabled=lock;$('#send2').disabled=lock;$('#push2').disabled=!D.alive;
+  const t=$('#term2');
+  t.innerHTML=D.lines.map(l=>`<span class="${l.kind}">${esc(l.text)}</span>`).join('\n')+(D.alive?'':'\n<span class="me">[process exited]</span>');
+  t.scrollTop=t.scrollHeight;
+  let st='';
+  if(!two&&D.inbox.length)st+=`<span class="bad">${D.inbox.length} message${D.inbox.length>1?'s':''} sitting unread in the socket buffer.</span> They only appear after you send a line. `;
+  if(!two&&D.phase==='conn'&&D.alive)st+='The input is locked: the loop is waiting for the server and can\'t read your keyboard. ';
+  if(two&&D.alive)st+='Type half a line, then press the Bob button. His message appears at once and your typing is untouched. ';
+  if(!D.alive)st+=two?'<code>/quit</code> made <code>write</code> return, then <code>main</code> returned, and the program exits. <code>read</code> is stopped with it, and so is any goroutine still running.':'<code>/quit</code> ended the loop and the program.';
+  $('#st2').innerHTML=st;
+}
+function demoSend(){
+  const inp=$('#in2');const t=inp.value.trim();if(!t||!D.alive)return;inp.value='';
+  if(t==='/quit'){D.alive=false;demoRender();return}
+  demoAdd('me','> '+t);
+  if(D.mode==='one'){D.phase='conn';if(D.inbox.length){demoAdd('rx',':: Bob: '+D.inbox.shift());D.phase='stdin'}}
+  demoRender();
+}
+function demoPush(){
+  if(!D.alive)return;const m=PUSHES[D.pushN++%PUSHES.length];
+  if(D.mode==='two'||D.phase==='conn'){demoAdd('rx',':: Bob: '+m);if(D.mode==='one')D.phase='stdin'}
+  else D.inbox.push(m);
+  demoRender();
+}
+function wireDemo(){
+  $$('#m2 button').forEach(b=>b.addEventListener('click',()=>{D.mode=b.dataset.m;demoReset()}));
+  $('#send2').addEventListener('click',demoSend);
+  $('#in2').addEventListener('keydown',e=>{if(e.key==='Enter')demoSend()});
+  $('#push2').addEventListener('click',demoPush);
+  $('#restart2').addEventListener('click',demoReset);
+}
+
+/* ====================== STEP 3: MAP OR SLICE ====================== */
+const M={mode:'slice',removed:new Set(),sender:null};
+function mapRender(){
+  $$('#mode2b button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===M.mode)));
+  $('#rmA').disabled=M.removed.has(0);$('#rmB').disabled=M.removed.has(1);
+  const living=[0,1,2].filter(i=>!M.removed.has(i));
+  const slice=M.mode==='slice';
+  let t=`<tr><th>${slice?'position in slice':'key in map'}</th><th>client</th><th>ID its goroutine remembers</th></tr>`;
+  living.forEach((id,pos)=>{const key=slice?pos:id;t+=`<tr><td class="mono">${key}</td><td>${NAMES[id]}</td><td class="mono ${key!==id?'bad':''}">${id}</td></tr>`});
+  $('#tab2b').innerHTML=t;
+  $('#snd2b').innerHTML=living.map(id=>`<button class="btn sm" data-snd="${id}">${NAMES[id]} sends</button>`).join('');
+  $$('#snd2b button').forEach(b=>b.addEventListener('click',()=>{M.sender=+b.dataset.snd;mapRender()}));
+  const st=$('#st2b');
+  if(M.sender===null||M.removed.has(M.sender)){st.textContent='Press a sender button to run the broadcast loop.';return}
+  const sid=M.sender;
+  const recv=living.map((id,pos)=>({id,key:slice?pos:id})).filter(r=>r.key!==sid).map(r=>r.id);
+  const should=living.filter(id=>id!==sid);
+  const missing=should.filter(id=>!recv.includes(id)),own=recv.includes(sid);
+  let h=`${NAMES[sid]}'s goroutine tags the message <code>sender: ${sid}</code>. The loop skips key <code>${sid}</code>, so it delivers to <b>${recv.map(i=>NAMES[i]).join(' and ')||'nobody'}</b>. `;
+  if(own)h+=`<span class="bad">${NAMES[sid]} gets their own message back.</span> `;
+  if(missing.length)h+=`<span class="bad">${missing.map(i=>NAMES[i]).join(' and ')} never gets it.</span>`;
+  if(!own&&!missing.length)h+='<span class="good">Correct.</span>';
+  st.innerHTML=h;
+}
+function wireMap(){
+  $$('#mode2b button').forEach(b=>b.addEventListener('click',()=>{M.mode=b.dataset.m;mapRender()}));
+  $('#rmA').addEventListener('click',()=>{M.removed.add(0);mapRender()});
+  $('#rmB').addEventListener('click',()=>{M.removed.add(1);mapRender()});
+  $('#rst2b').addEventListener('click',()=>{M.removed.clear();M.sender=null;mapRender()});
+}
+
+/* ====================== STEP 5: OWNERSHIP TABLE ====================== */
+function ownTable(){
+  const rows=[
+    ['clients map','','','read + write',''],
+    ['n (ID counter)','','','read + write',''],
+    ['conns channel','send','','receive',''],
+    ['msgs channel','','','receive','send'],
+    ['a client\'s net.Conn, reading','','','','read'],
+    ['a client\'s net.Conn, writing','','','write',''],
+    ['listener ln','Accept','','','']
+  ];
+  let t;
+  t='<tr><th></th><th>acceptConns</th><th>main</th><th>handleClient (each)</th></tr>';
+  rows.forEach(r=>{t+=`<tr><td>${r[0]}</td>${[r[1],r[3],r[4]].map(c=>`<td class="${c?'w':''}">${c||''}</td>`).join('')}</tr>`});
+  $('#own4').innerHTML=t;
+}
+
+/* ====================== STEP 7 ====================== */
+const SERVER=[
+ ['package main'],
+ [''],
+ ['type Message struct {','The message carries the sender\'s ID so the broadcast can skip it.'],
+ ['\tsender  int'],
+ ['\tmessage string'],
+ ['}'],
+ [''],
+ ['func acceptConns(ln net.Listener, conns chan net.Conn) {','Goroutine 2. Its only job is to turn blocking Accept calls into values on a channel.'],
+ ['\tfor {'],
+ ['\t\tconn, err := ln.Accept()'],
+ ['\t\thandleError(err)'],
+ ['\t\tconns <- conn','Hands the connection to main. Waits here until main is ready to receive it.'],
+ ['\t}'],
+ ['}'],
+ [''],
+ ['func handleClient(client net.Conn, clientid int, msgs chan Message) {','One of these per client, each running as its own goroutine.'],
+ ['\treader := bufio.NewReader(client)'],
+ ['\tfor {'],
+ ['\t\tmsg, err := reader.ReadString(\'\\n\')','Blocks until a whole line arrives from this client.'],
+ ['\t\tif err != nil {'],
+ ['\t\t\tbreak','The client disconnected. The goroutine ends, but main isn\'t told.'],
+ ['\t\t}'],
+ ['\t\tmsgs <- Message{sender: clientid, message: msg}','Tag the line with who sent it and pass it to main.'],
+ ['\t}'],
+ ['}'],
+ [''],
+ ['func main() {'],
+ ['\tln, err := net.Listen("tcp", *portPtr)','Start listening on the port. Nothing is accepted until Accept is called.'],
+ ['\thandleError(err)'],
+ ['\tconns := make(chan net.Conn)'],
+ ['\tmsgs := make(chan Message)'],
+ ['\tclients := make(map[int]net.Conn)','The list of connections: ID to connection.'],
+ ['\tn := 0','The next ID to hand out. It only ever goes up, so IDs are never reused.'],
+ ['\tgo acceptConns(ln, conns)'],
+ ['\tfor {'],
+ ['\t\tselect {','Wait for whichever happens first. Only one case runs at a time.'],
+ ['\t\tcase conn := <-conns:'],
+ ['\t\t\tclients[n] = conn'],
+ ['\t\t\tgo handleClient(conn, n, msgs)','Start this client\'s reader goroutine.'],
+ ['\t\t\tn++'],
+ ['\t\tcase msg := <-msgs:'],
+ ['\t\t\tfor i, client := range clients {'],
+ ['\t\t\t\tif msg.sender != i {','Everyone except the sender.'],
+ ['\t\t\t\t\tfmt.Fprintf(client, msg.message)','Works, but treats the message as a format string. Prefer fmt.Fprint.'],
+ ['\t\t\t\t}'],
+ ['\t\t\t}'],
+ ['\t\t}'],
+ ['\t}'],
+ ['}']
+];
+const CLIENT=[
+ ['func read(conn *net.Conn) {','Runs as its own goroutine, started from main.'],
+ ['\treader := bufio.NewReader(*conn)'],
+ ['\tfor {'],
+ ['\t\tline, _ := reader.ReadString(\'\\n\')','The error is ignored, so if the server closes the connection this loop spins. Check err and return.'],
+ ['\t\tfmt.Println(":: ", line)'],
+ ['\t}'],
+ ['}'],
+ [''],
+ ['func write(conn *net.Conn) {','Runs on the main goroutine. It blocks on the keyboard for most of its life.'],
+ ['\treader := bufio.NewReader(os.Stdin)'],
+ ['\tfor {'],
+ ['\t\tfmt.Println("Enter text:")'],
+ ['\t\ttext, _ := reader.ReadString(\'\\n\')'],
+ ['\t\tif text == "/quit\\n" {','Typing /quit ends write. That returns control to main.'],
+ ['\t\t\tbreak'],
+ ['\t\t} else {'],
+ ['\t\t\tfmt.Fprintf(*conn, text)','Sends the line, newline included, so the server can split on \'\\n\'.'],
+ ['\t\t}'],
+ ['\t}'],
+ ['}'],
+ [''],
+ ['func main() {'],
+ ['\taddrPtr := flag.String("ip", "127.0.0.1:8030", "IP:port string to connect to")'],
+ ['\tflag.Parse()'],
+ ['\tconn, _ := net.Dial("tcp", *addrPtr)','Connect to the server. The error is ignored here, so a missing server shows up later as a nil pointer crash.'],
+ ['\tgo read(&conn)','Start the listening goroutine first, so it is running while write blocks.'],
+ ['\twrite(&conn)','Run write on the main goroutine. When it returns, main returns and the program exits, taking read with it.'],
+ ['}']
+];
+function goFmt(s){return s.replace(/%(?:(%)|[-+# 0]*\d*(?:\.\d+)?([A-Za-z])|$)/g,(m,p,v)=>p?'%':v?`%!${v}(MISSING)`:'%!(NOVERB)')}
+function fmtDemo(){const v=$('#fmt7').value;$('#fa7').textContent=goFmt(v)||' ';$('#fb7').textContent=v||' '}
+function codeTab(f){
+  $$('#tab7 button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.f===f)));
+  codeBlock('code6','note6',f==='server'?SERVER:CLIENT);
+}
+let spinT=0;
+function spinDemo(){
+  cancelAnimationFrame(spinT);const out=$('#spinout7');let n=0;const t0=performance.now();
+  const tick=now=>{
+    n+=Math.floor(2500+Math.random()*1500);
+    out.textContent=':: printed '+n.toLocaleString()+' blank lines';
+    if(now-t0<1600&&!RM)spinT=requestAnimationFrame(tick);else out.textContent+=' … and still going';
+  };
+  tick(performance.now());
+}
+
+/* ====================== STEPS & NAV ====================== */
+let step=0;
+function buildRail(){
+  const ol=$('#steps');
+  STEPS.forEach((t,i)=>{const li=document.createElement('li');li.innerHTML=`<button type="button" data-step="${i}"><span class="n">${i+1}</span><span>${t}</span></button>`;ol.appendChild(li)});
+  ol.addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(+b.dataset.step)});
+  $$('.jump').forEach(b=>b.addEventListener('click',()=>go(+b.dataset.go)));
+  $('#back').addEventListener('click',()=>go(step-1));
+  $('#fwd').addEventListener('click',()=>go(step+1));
+}
+function go(i){
+  i=Math.max(0,Math.min(STEPS.length-1,i));step=i;
+  activeSims.forEach(s=>s.destroy());activeSims=[];
+  $$('.step').forEach((s,j)=>s.classList.toggle('on',j===i));
+  $$('#steps button').forEach((b,j)=>{if(j===i)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});
+  $('#back').disabled=i===0;$('#fwd').disabled=i===STEPS.length-1;
+  $('#fwd').textContent=i<STEPS.length-1?'Next: '+STEPS[i+1]:'Done';
+  enter(i);
+  window.scrollTo({top:0,behavior:RM?'auto':'smooth'});
+}
+function enter(i){
+  if(i===0)codeBlock('code0','note0',[
+    ['//TODO Create a Listener for TCP connections on the port given above.','Step 3 fills this in with net.Listen.'],
+    [''],
+    ['conns := make(chan net.Conn)','A channel of new connections. acceptConns will put each one in; main will take it out.'],
+    ['msgs := make(chan Message)','A channel of chat messages. Every handleClient goroutine will put lines in; main will take them out.'],
+    ['clients := make(map[int]net.Conn)','The list of connections, keyed by client ID. Only main will touch it.'],
+    [''],
+    ['go acceptConns(ln, conns)','Starts a second goroutine so that waiting for new connections never blocks main.'],
+    ['for {'],
+    ['\tselect {','Main waits here for either a new connection or a new message, whichever comes first.'],
+    ['\tcase conn := <-conns:','Step 3: store the new client and start reading from it.'],
+    ['\t\t//TODO Deal with a new connection'],
+    ['\tcase msg := <-msgs:','Step 5: send the message to every client except the sender.'],
+    ['\t\t//TODO Deal with a new message'],
+    ['\t}'],
+    ['}']
+  ]);
+  if(i===1){
+    codeBlock('code1','note1',[
+      ['func read(conn *net.Conn) {','Job 1: show whatever the server sends. This will run as its own goroutine.'],
+      ['\treader := bufio.NewReader(*conn)'],
+      ['\tfor {'],
+      ['\t\tline, _ := reader.ReadString(\'\\n\')','Blocks until a full line arrives from the server, then wakes up.'],
+      ['\t\tfmt.Println(":: ", line)'],
+      ['\t}'],
+      ['}'],
+      [''],
+      ['func write(conn *net.Conn) {','Job 2: read the keyboard and send each line. Runs on the main goroutine.'],
+      ['\t// loop: ReadString from os.Stdin, then Fprintf to *conn','Blocks until you press Enter. While it waits, it can\'t do anything else.'],
+      ['}'],
+      [''],
+      ['conn, _ := net.Dial("tcp", *addrPtr)','Connect to the server first.'],
+      ['go read(&conn)','The key line. Start read as a goroutine and carry on immediately.'],
+      ['write(&conn)','Run write on the current goroutine. It blocks here until you type /quit, which keeps main alive. If main returned early, the program would exit and stop read.']
+    ]);
+    demoReset();
+  }
+  if(i===2){
+    codeBlock('code2','note2',[
+      ['ln, err := net.Listen("tcp", *portPtr)','Open the port. After this, the operating system queues incoming connections for us.'],
+      ['handleError(err)'],
+      [''],
+      ['func acceptConns(ln net.Listener, conns chan net.Conn) {','The second goroutine. It does nothing but accept.'],
+      ['\tfor {'],
+      ['\t\tconn, err := ln.Accept()','Blocks until a client connects. This is exactly why it needs its own goroutine.'],
+      ['\t\thandleError(err)'],
+      ['\t\tconns <- conn','Pass the connection to main. Unbuffered: this waits until main is receiving.'],
+      ['\t}'],
+      ['}'],
+      [''],
+      ['go acceptConns(ln, conns)'],
+      ['// in main\'s select:'],
+      ['case conn := <-conns:','Main receives the connection.'],
+      ['\tclients[n] = conn','Store it in the map under the next free ID.'],
+      ['\tn++','Bump the counter, so the next client gets a different ID.']
+    ]);
+    makeSim('sim2',{layer:1});
+    M.mode='slice';M.removed.clear();M.sender=null;mapRender();
+  }
+  if(i===3){
+    codeBlock('code3','note3',[
+      ['func handleClient(client net.Conn, clientid int, msgs chan Message) {','One copy runs per client, each as its own goroutine.'],
+      ['\treader := bufio.NewReader(client)','Wraps the connection so we can read up to a newline.'],
+      ['\tfor {'],
+      ['\t\tmsg, err := reader.ReadString(\'\\n\')','Blocks until this client sends a line. Other clients are unaffected: they have their own goroutines.'],
+      ['\t\tif err != nil {'],
+      ['\t\t\tbreak','The client has gone (EOF or a network error), so stop reading. The goroutine ends.'],
+      ['\t\t}'],
+      ['\t\tmessage := Message{sender: clientid, message: msg}','Record which client it came from, so main can skip them when broadcasting.'],
+      ['\t\tmsgs <- message','Hand it to main. All handleClient goroutines share this one channel.'],
+      ['\t}'],
+      ['}'],
+      [''],
+      ['// in main\'s select:'],
+      ['case conn := <-conns:'],
+      ['\tclients[n] = conn'],
+      ['\tgo handleClient(conn, n, msgs)','Start the reader for this client. It runs concurrently and main moves on straight away.'],
+      ['\tn++']
+    ]);
+    makeSim('sim3',{layer:2});
+  }
+  if(i===4){
+    codeBlock('code4','note4',[
+      ['for {','Main runs this loop for the life of the server.'],
+      ['\tselect {','Blocks until a case can proceed. If both are ready, Go picks one. Each case runs to the end before the next select.'],
+      ['\tcase conn := <-conns:','A new client: store it and start its goroutine (steps 3 and 4).'],
+      ['\t\t// ...'],
+      ['\tcase msg := <-msgs:','A line from some client.'],
+      ['\t\tfor i, client := range clients {','Walk every connection in the map. i is the client ID, client is its net.Conn. The order is random.'],
+      ['\t\t\tif msg.sender != i {','Skip the client who sent it.'],
+      ['\t\t\t\tfmt.Fprintf(client, msg.message)','Write the line to that client\'s connection. Their read goroutine will wake up and print it.'],
+      ['\t\t\t}'],
+      ['\t\t}'],
+      ['\t}'],
+      ['}']
+    ]);
+    ownTable();
+    makeSim('sim4',{layer:3,pre:true});
+  }
+  if(i===5)makeSim('sim5',{layer:3,ext:true});
+  if(i===6){codeTab('server');fmtDemo()}
+}
+
+/* ---------- boot ---------- */
+buildRail();wireDemo();wireMap();
+$$('#tab7 button').forEach(b=>b.addEventListener('click',()=>codeTab(b.dataset.f)));
+$('#fmt7').addEventListener('input',fmtDemo);
+$('#spin7').addEventListener('click',spinDemo);
+go(0);
+</script>
+</body>
+</html>
