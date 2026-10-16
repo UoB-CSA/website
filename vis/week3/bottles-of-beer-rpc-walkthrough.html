@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>99 bottles of beer over RPC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#EBF0F3; --panel:#FFFFFF; --ink:#12232C; --muted:#50646E; --line:#C4D1D8; --soft:#DFE8EC;
+  --accent:#0A6B7E; --accent-ink:#FFFFFF; --warn:#B3202A; --ok:#1E7B46;
+  --chan:#B26A00; --mapc:#6A4BC0;
+  --code-bg:#0E2430; --code-ink:#DBE9EF; --grid:rgba(18,35,44,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B161C; --panel:#12242E; --ink:#E3EDF1; --muted:#92A7B1; --line:#284350; --soft:#1A313D;
+    --accent:#52C4DA; --accent-ink:#06222B; --warn:#FF8089; --ok:#6FD39A;
+    --chan:#E9B949; --mapc:#A894F0;
+    --code-bg:#08141A; --code-ink:#DBE9EF; --grid:rgba(227,237,241,.07);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B161C; --panel:#12242E; --ink:#E3EDF1; --muted:#92A7B1; --line:#284350; --soft:#1A313D;
+  --accent:#52C4DA; --accent-ink:#06222B; --warn:#FF8089; --ok:#6FD39A;
+  --chan:#E9B949; --mapc:#A894F0;
+  --code-bg:#08141A; --code-ink:#DBE9EF; --grid:rgba(227,237,241,.07);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+h1,h2,h3{font-family:'Bricolage Grotesque','Instrument Sans',system-ui,sans-serif;line-height:1.15;margin:0}
+h1{font-size:clamp(1.9rem,4.4vw,3rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.01em;margin-bottom:.4rem}
+h3{font-size:1.05rem;font-weight:600;margin-bottom:.35rem}
+p{margin:.5rem 0}
+code,.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.86em}
+p code,li code,td code,.note code,.status code,summary code{background:var(--soft);padding:.08em .35em;border-radius:4px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.head{max-width:1180px;margin:0 auto;padding:34px 20px 18px}
+.head p{max-width:68ch;color:var(--muted);font-size:1.05rem;margin-top:.7rem}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);gap:30px;max-width:1180px;margin:0 auto;padding:0 20px 70px;align-items:start}
+.rail{position:sticky;top:calc(14px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:22px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;border-left:2px solid var(--line)}
+.steps button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:baseline;padding:8px 10px 8px 14px;margin-left:-2px;border-left:2px solid transparent;width:100%;color:var(--muted);font-weight:500}
+.steps button .n{font-family:'JetBrains Mono',monospace;font-size:.8rem;min-width:1.1em}
+.steps button:hover{color:var(--ink)}
+.steps button[aria-current="step"]{color:var(--ink);border-left-color:var(--accent);font-weight:600;background:linear-gradient(90deg,var(--soft),transparent)}
+.steps button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.legend{font-size:.86rem;color:var(--muted)}
+.legend div{display:flex;align-items:center;gap:8px;margin:4px 0}
+.lg{display:inline-block;width:22px;height:14px;border-radius:4px;border:2.5px solid}
+
+.step{display:none}
+.step.on{display:block}
+.lede{font-size:1.08rem;color:var(--muted);max-width:72ch}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin-top:20px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.stack>*+*{margin-top:16px}
+.full{margin-top:20px}
+
+pre.code{background:var(--code-bg);color:var(--code-ink);font:13px/1.65 'JetBrains Mono',ui-monospace,monospace;padding:12px 0;border-radius:8px;overflow-x:auto;margin:0}
+pre.plain{background:var(--code-bg);color:var(--code-ink);font:12.5px/1.7 'JetBrains Mono',ui-monospace,monospace;padding:10px 14px;border-radius:8px;overflow-x:auto;margin:0;white-space:pre}
+.ln{display:block;padding:0 14px 0 11px;white-space:pre;border-left:3px solid transparent}
+.ln.has{cursor:pointer;border-left-color:#52C4DA}
+.ln.has:hover{background:rgba(82,196,218,.1)}
+.ln.sel{background:rgba(82,196,218,.22)}
+.k{color:#7FD1E6}.s{color:#A8DDA9}.c{color:#7F98A5;font-style:italic}.t{color:#E8C27A}.a{color:#FFAB70}
+.note{margin-top:10px;font-size:.95rem;border-left:3px solid var(--accent);padding:6px 12px;background:var(--soft);border-radius:0 6px 6px 0;min-height:3.3em}
+.note b{font-weight:600}
+.tap{font-size:.82rem;color:var(--muted);margin:6px 0 0}
+
+.fig{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background-color:var(--panel);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:16px 16px}
+.figcap{font-size:.86rem;color:var(--muted);margin:6px 0 0}
+.big{font-family:'JetBrains Mono',monospace;font-size:.92rem;background:var(--soft);padding:8px 12px;border-radius:6px;overflow-x:auto;white-space:nowrap}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0}
+.btn{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 13px;font-weight:500}
+.btn:hover:not([disabled]){border-color:var(--accent)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{padding:3px 10px;font-size:.88rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:5px 11px;font-size:.9rem;text-align:left}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.seg.col{flex-direction:column}
+.seg.col button{font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.4;white-space:normal;word-break:break-word}
+select,.in{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+input[type=range]{accent-color:var(--accent);width:100%}
+.chk{display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:.95rem}
+.chk input{margin-top:.28em;accent-color:var(--accent)}
+.status{font-size:.95rem;min-height:2.4em}
+.bad{color:var(--warn);font-weight:600}
+.good{color:var(--ok);font-weight:600}
+.verdict{border-radius:8px;padding:10px 14px;margin-top:12px;border:1px solid var(--line);background:var(--soft)}
+.verdict.y{border-color:var(--ok)}
+.verdict.n{border-color:var(--warn)}
+.pager{display:flex;justify-content:space-between;gap:10px;margin-top:30px;padding-top:16px;border-top:1px solid var(--line)}
+.pager .btn[disabled]{visibility:hidden}
+details{border-top:1px solid var(--line);padding:10px 0}
+details summary{cursor:pointer;font-weight:600}
+details p{color:var(--muted)}
+ul.tight{margin:.4rem 0;padding-left:1.2rem}
+ul.tight li{margin:.25rem 0}
+a.jump{color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px;background:none;border:0;padding:0;font:inherit}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.92rem;align-items:baseline}
+.kv .mono{background:var(--soft);padding:2px 8px;border-radius:4px}
+.loglist{margin:8px 0 0;padding:0;list-style:none;font-size:.92rem}
+.loglist li{padding:5px 0;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted)}
+
+/* ring simulation */
+.simsvg text{font-family:'Instrument Sans',system-ui,sans-serif}
+.simsvg .t1{font-size:20px;font-weight:700;fill:var(--ink)}
+.simsvg .t2{font-size:11.5px;fill:var(--muted);font-family:'JetBrains Mono',monospace}
+.simsvg .tm{font-size:11px;fill:var(--ink);font-family:'JetBrains Mono',monospace}
+.simsvg .ta{font-size:11px;fill:var(--accent);font-family:'JetBrains Mono',monospace}
+.simsvg .tw{font-size:11px;fill:var(--warn);font-family:'JetBrains Mono',monospace;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.slot{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:8px;padding:10px}
+.slot header{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.slot .nm{font-weight:600}
+.slot .fl{font-size:.74rem;color:var(--muted);margin:6px 0 0;word-break:break-word}
+.chip{font-size:.74rem;padding:1px 8px;border-radius:99px;background:var(--soft);color:var(--muted)}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+.chip.bad{background:var(--warn);color:#fff}
+pre.term{background:var(--code-bg);color:var(--code-ink);font:11.5px/1.5 'JetBrains Mono',monospace;padding:8px;border-radius:6px;height:150px;overflow:auto;margin:8px 0 0;white-space:pre-wrap;word-break:break-word}
+.simbar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:10px 0 0;font-size:.92rem}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:14px}
+  .rail{position:static;gap:14px}
+  .steps{flex-direction:row;overflow-x:auto;border-left:0;border-bottom:2px solid var(--line)}
+  .steps button{width:auto;white-space:nowrap;border-left:0;border-bottom:2px solid transparent;margin:0 0 -2px;padding:8px 12px}
+  .steps button[aria-current="step"]{border-bottom-color:var(--accent);background:none}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .cards{grid-template-columns:minmax(0,1fr)}
+  .legend{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="head">
+  <h1>99 bottles of beer, passed around a ring over RPC</h1>
+  <p>A few processes sit in a ring. Each one knows only its neighbour. A single value, the number of bottles, is handed from process to process by remote procedure call, and each one sings a verse when it gets it. Six steps build the solution, with a live ring you can start, break and watch.</p>
+</header>
+
+<div class="shell">
+  <aside class="rail">
+    <nav aria-label="Steps"><ol class="steps" id="steps"></ol></nav>
+    <div class="legend" aria-label="Colour key">
+      <div><span class="lg" style="border-color:var(--accent)"></span>a running process</div>
+      <div><span class="lg" style="border-color:var(--line);border-style:dashed"></span>a stopped process</div>
+      <div><span class="lg" style="border-color:var(--warn)"></span>crashed</div>
+    </div>
+  </aside>
+
+  <main id="stage">
+
+  <!-- 1 -->
+  <section class="step" id="s0" aria-labelledby="h0">
+    <h2 id="h0">The brief: a ring of processes</h2>
+    <p class="lede">Run the same program several times, each in its own terminal. Every copy listens on its own port and is told the address of the <em>next</em> copy. One copy is also told how many bottles to start with. That copy sings the first verse and sends the count on. Each receiver sings one verse and passes it along, until the count reaches zero.</p>
+    <div class="cols">
+      <div class="panel">
+        <h3>The three flags</h3>
+        <pre class="code" id="code0"></pre>
+        <div class="note" id="note0"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Build a ring</h3>
+        <div class="row" style="margin-top:0">
+          <label>Processes <input class="in" type="number" id="rn" min="2" max="5" value="3" style="width:4.5em"></label>
+          <label>Bottles <input class="in" type="number" id="rb" min="1" max="99" value="99" style="width:4.5em"></label>
+        </div>
+        <div class="fig"><svg id="rsvg" viewBox="0 0 300 230" style="display:block;width:100%;height:auto" role="img" aria-label="A ring of processes"></svg></div>
+        <p class="figcap">Start them in this order, one per terminal. The ports are only an example.</p>
+        <pre class="plain" id="cmds"></pre>
+        <p class="figcap">Each <code>-next</code> is the following process's port, and the last one points back to the first. The starter goes last, for a reason you'll see in step 5.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="step" id="s1" aria-labelledby="h1">
+    <h2 id="h1">Exposing a method over RPC</h2>
+    <p class="lede">Go's <code>net/rpc</code> lets one process call a method on another as if it were local. The receiving process registers a type, listens on a port, and accepts connections. Each call arrives as a method call on that type.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code1"></pre>
+        <div class="note" id="note1"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>What counts as an RPC method?</h3>
+        <p>Pick a signature. <code>net/rpc</code> only exposes methods that follow its rules.</p>
+        <div class="seg col" id="sigs" role="group" aria-label="Candidate method signatures"></div>
+        <div class="verdict" id="sigv" aria-live="polite"></div>
+        <p class="figcap">The rules: the method and its type are exported, it takes two arguments of exported (or built-in) types, the second is a pointer, and it returns <code>error</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step" id="s2" aria-labelledby="h2x">
+    <h2 id="h2x">Calling the next process</h2>
+    <p class="lede"><code>PassItAround</code> opens a connection to the next process the first time it is needed, keeps it in a global, and makes an <em>asynchronous</em> call. The call is named by the type and method, <code>"BottlesOfBeer.Round"</code>, because that is how it was registered.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code2"></pre>
+        <div class="note" id="note2"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Call it a few times</h3>
+        <div class="kv" style="margin-bottom:10px">
+          <span>initialised</span><span class="mono" id="l_init">false</span>
+          <span>nextround</span><span class="mono" id="l_cl">nil</span>
+        </div>
+        <label class="chk"><input type="checkbox" id="l_miss"> <span>The next process isn't running yet</span></label>
+        <div class="row">
+          <button class="btn pri" id="l_go"></button>
+          <button class="btn" id="l_rst">Restart this process</button>
+        </div>
+        <ul class="loglist" id="l_log" aria-live="polite"></ul>
+        <table style="margin-top:12px">
+          <tr><th></th><th><code>Call</code></th><th><code>Go</code> (used here)</th></tr>
+          <tr><td>Returns</td><td>when the reply has arrived</td><td>straight away, with a <code>*Call</code></td></tr>
+          <tr><td>The reply</td><td>already in <code>resp</code></td><td>arrives later; we never look</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step" id="s3" aria-labelledby="h3x">
+    <h2 id="h3x">Watch the token go round</h2>
+    <p class="lede">When <code>Round</code> is called, it sleeps a second, sings the verse, and, if there are bottles left, calls <code>Round</code> on the next process with one fewer. At zero it sings the last verse and stops.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code3"></pre>
+        <div class="note" id="note3"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Go or Call?</h3>
+        <p>The solution uses <code>Go</code>, so each <code>Round</code> returns right after it hands the token on. Tick the box below to switch to <code>Call</code> and see the difference.</p>
+        <ul class="tight">
+          <li>With <code>Go</code>, no handler waits for anything, and the replies that come back are thrown away.</li>
+          <li>With <code>Call</code>, each handler stays blocked until the whole rest of the round has finished. The open calls pile up around the ring, then unwind in reverse at the end.</li>
+        </ul>
+        <p class="figcap">Press <b>Start ring</b>. It starts C, then B, then A, with A launching the round.</p>
+      </div>
+    </div>
+    <div class="panel full"><div id="ring3"></div></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="step" id="s4" aria-labelledby="h4x">
+    <h2 id="h4x">Starting the round, and breaking it</h2>
+    <p class="lede">The starter sings the first verse itself, then sends the token on in a goroutine and starts serving. Because errors from dialing and calling are ignored, a ring with a missing or dead member doesn't fail loudly. See for yourself.</p>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code4"></pre>
+        <div class="note" id="note4"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Experiments</h3>
+        <ul class="tight">
+          <li><b>Wrong order.</b> Start only A. It sings, tries to dial B, and crashes with a nil pointer panic.</li>
+          <li><b>A node missing.</b> Start A and B but not C. B crashes when it tries to pass the token to C.</li>
+          <li><b>Kill a node mid-round.</b> Run the whole ring, then press Stop on B during the song. Nothing complains. The ring just goes quiet.</li>
+          <li><b>Restart it.</b> Start B again. The song doesn't resume: nobody holds the token, and A's old connection to B is dead.</li>
+        </ul>
+        <p class="figcap">Set the speed to Fast to get through verses quickly. The starter's bottle count is on A's card.</p>
+      </div>
+    </div>
+    <div class="panel full"><div id="ring4"></div></div>
+  </section>
+
+  <!-- 6 -->
+  <section class="step" id="s5" aria-labelledby="h5x">
+    <h2 id="h5x">Whole solution and gotchas</h2>
+    <div class="cols">
+      <div class="panel">
+        <pre class="code" id="code5"></pre>
+        <div class="note" id="note5"></div>
+        <p class="tap">Tap a marked line.</p>
+      </div>
+      <div class="panel">
+        <h3>Gotchas</h3>
+        <details open>
+          <summary>The verses run together</summary>
+          <p>The format strings for the verse end in <code>"pass it around..."</code> with no <code>\n</code>, so the next verse starts on the same line. The terminals in step 4 show it. Add a newline to the format string if you want one verse per pair of lines.</p>
+        </details>
+        <details>
+          <summary>Every error is thrown away</summary>
+          <p><code>rpc.Register</code>, <code>net.Listen</code>, <code>rpc.Dial</code> and the result of <code>Go</code> all have errors that are ignored. A failed <code>Dial</code> leaves <code>nextround</code> nil, which panics on the next line. A broken connection makes <code>Go</code> fail quietly. Checking those errors and printing them would make the failures in step 5 obvious.</p>
+        </details>
+        <details>
+          <summary>Shared globals and goroutines</summary>
+          <p><code>initialised</code> and <code>nextround</code> are plain globals. The starter calls <code>PassItAround</code> from one goroutine, and each incoming <code>Round</code> runs in yet another. Only one token is ever in flight, so in practice they don't collide, but the language doesn't guarantee that. <code>go run -race</code> or a mutex would make it safe.</p>
+        </details>
+        <details>
+          <summary>Why <span class="mono">go PassItAround</span> in main?</summary>
+          <p>So main goes straight on to <code>rpc.Accept</code> and starts serving, while the dial and the first call happen in the background. Calling it directly would also work here, since <code>Go</code> doesn't wait for the reply.</p>
+        </details>
+        <details>
+          <summary>The processes never exit</summary>
+          <p><code>rpc.Accept</code> never returns, so after the last verse every process keeps listening until you press Ctrl-C. The token simply stops at zero: that process sings the final verse and doesn't pass it on.</p>
+        </details>
+        <details>
+          <summary>Counting verses</summary>
+          <p>The starter sings <code>n</code>, then the token carries <code>n-1</code>, and so on down to <code>0</code>, so a ring started with <code>-n 99</code> sings 100 verses, the last of them "No more bottles".</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <div class="pager">
+    <button class="btn" id="back">Back</button>
+    <button class="btn pri" id="fwd">Next</button>
+  </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STEPS=["The brief","Exposing a method","Calling the next process","Watch the token","Starting and breaking","Whole solution"];
+
+/* ---------- code blocks ---------- */
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const HLRE=/(\/\/.*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(func|for|go|if|else|var|range|return|make|append|chan|package|import|select|case|type|struct|map|break|defer|new)\b|\b(uint8|int|string|error|bool)\b|(&lt;-)/g;
+const hl=s=>esc(s).replace(HLRE,(m,c,st,k,t,a)=>c?`<span class="c">${c}</span>`:st?`<span class="s">${st}</span>`:k?`<span class="k">${k}</span>`:t?`<span class="t">${t}</span>`:`<span class="a">${a}</span>`);
+function codeBlock(preId,noteId,lines){
+  const pre=$('#'+preId),note=$('#'+noteId);pre.innerHTML='';const els=[];
+  lines.forEach(([txt,n])=>{
+    const d=document.createElement('span');d.className='ln';d.innerHTML=hl(txt)||' ';
+    if(n){d.classList.add('has');d.tabIndex=0;d.setAttribute('role','button');
+      const pick=()=>{els.forEach(e=>e.classList.remove('sel'));d.classList.add('sel');note.innerHTML=n};
+      d.addEventListener('click',pick);
+      d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}});
+      d._pick=pick;
+    }
+    pre.appendChild(d);els.push(d);
+  });
+  const first=els.find(e=>e._pick);if(first)first._pick();
+}
+
+function verse(i){
+  if(i>1)return `${i} bottles of beer on the wall, ${i} bottles of beer\nTake one down, pass it around...`;
+  if(i===1)return `One bottle of beer on the wall, one bottle of beer\nTake it down, pass it around...`;
+  return `No more bottles of beer on the wall, no more bottles of beer\nGo to the store and buy some more!\n`;
+}
+
+/* ====================== STEP 1: RING BUILDER ====================== */
+function ringBuilder(){
+  const N=Math.max(2,Math.min(5,+$('#rn').value||3)),B=Math.max(1,Math.min(99,+$('#rb').value||99));
+  const port=i=>8030+10*i;
+  const cx=150,cy=112,R=78;
+  const pos=i=>{const a=-Math.PI/2+i*2*Math.PI/N;return[cx+R*Math.cos(a),cy+R*Math.sin(a)]};
+  let s='<defs><marker id="ra" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="var(--muted)"/></marker></defs>';
+  for(let i=0;i<N;i++){
+    const j=(i+1)%N,[x1,y1]=pos(i),[x2,y2]=pos(j);
+    const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),ux=dx/L,uy=dy/L;
+    s+=`<line x1="${x1+ux*26}" y1="${y1+uy*26}" x2="${x2-ux*30}" y2="${y2-uy*30}" stroke="var(--muted)" stroke-width="1.6" marker-end="url(#ra)"/>`;
+  }
+  for(let i=0;i<N;i++){
+    const [x,y]=pos(i);
+    s+=`<circle cx="${x}" cy="${y}" r="23" fill="${i===0?'var(--accent)':'var(--panel)'}" stroke="var(--accent)" stroke-width="2.5"/>`;
+    s+=`<text x="${x}" y="${y-2}" text-anchor="middle" font-size="14" font-weight="700" fill="${i===0?'var(--accent-ink)':'var(--ink)'}" font-family="Instrument Sans,sans-serif">${'ABCDE'[i]}</text>`;
+    s+=`<text x="${x}" y="${y+12}" text-anchor="middle" font-size="9.5" fill="${i===0?'var(--accent-ink)':'var(--muted)'}" font-family="JetBrains Mono,monospace">:${port(i)}</text>`;
+  }
+  s+=`<text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="Instrument Sans,sans-serif">token: ${B}</text>`;
+  $('#rsvg').innerHTML=s;
+  const order=[];for(let i=N-1;i>=1;i--)order.push(i);order.push(0);
+  $('#cmds').textContent=order.map((i,k)=>`# ${k+1}. process ${'ABCDE'[i]}\ngo run bottlesofbeer.go -this ${port(i)} -next localhost:${port((i+1)%N)}${i===0?' -n '+B:''}`).join('\n');
+}
+
+/* ====================== STEP 2: SIGNATURES ====================== */
+const SIGS=[
+ {code:'func (b *BottlesOfBeer) Round(intoken Token, outtoken *Token) (err error)',ok:true,why:'The solution. The method is exported, it takes two exported types, the second argument is a pointer, and it returns error.'},
+ {code:'func (b *BottlesOfBeer) Round(intoken *Token, outtoken *Token) error',ok:true,why:'Also fine. The request argument may be a pointer as well.'},
+ {code:'func (b *BottlesOfBeer) round(intoken Token, outtoken *Token) error',ok:false,why:'A lower-case method isn\'t exported, so net/rpc ignores it. <code>rpc.Register</code> would return an error saying the type has no suitable methods, but the solution throws that error away. The program starts, and every call then fails.'},
+ {code:'func (b *BottlesOfBeer) Round(intoken Token, outtoken Token) error',ok:false,why:'The second argument must be a pointer. It is where net/rpc puts the reply to send back.'},
+ {code:'func (b *BottlesOfBeer) Round(intoken Token, outtoken *Token)',ok:false,why:'The method must return <code>error</code>. net/rpc sends that error to the caller.'},
+ {code:'func (b *BottlesOfBeer) Round(intoken Token) error',ok:false,why:'It needs exactly two arguments: the request and the reply pointer.'},
+ {code:'type Token struct { bottles int }',ok:false,why:'The method is fine, but the data travels as gob, which only encodes exported fields. A struct with none can\'t be sent, so every call fails with an error. That is why the field is <code>Bottles</code>.'}
+];
+let sigSel=0;
+function sigRender(){
+  const box=$('#sigs');
+  if(!box.children.length){
+    SIGS.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.textContent=s.code;b.addEventListener('click',()=>{sigSel=i;sigRender()});box.appendChild(b)});
+  }
+  [...box.children].forEach((b,i)=>b.setAttribute('aria-pressed',String(i===sigSel)));
+  const s=SIGS[sigSel],v=$('#sigv');
+  v.className='verdict '+(s.ok?'y':'n');
+  v.innerHTML=`<b class="${s.ok?'good':'bad'}">${s.ok?'Accepted':'Rejected'}.</b> ${s.why}`;
+}
+
+/* ====================== STEP 3: LAZY DIAL ====================== */
+const LZ={init:false,cl:false,b:4,dead:false,log:[]};
+function lazyReset(){LZ.init=false;LZ.cl=false;LZ.b=4;LZ.dead=false;LZ.log=[];lazyRender()}
+function lazyCall(){
+  const b=LZ.b--;const miss=$('#l_miss').checked;const L=[];
+  if(!LZ.init){
+    L.push(`<code>initialised == false</code>, so <code>rpc.Dial("tcp", nextAddr)</code> runs.`);
+    if(miss){
+      L.push(`Nothing is listening there. <code>Dial</code> returns <code>(nil, error)</code>, and the <code>_</code> discards the error. <code>nextround</code> is now nil.`);
+      LZ.init=true;LZ.cl=false;
+      L.push(`<span class="bad">nextround.Go(...) on a nil client: panic, nil pointer dereference. The process dies.</span>`);
+      LZ.dead=true;
+    }else{
+      LZ.init=true;LZ.cl=true;
+      L.push(`Connected. <code>nextround</code> holds the client and <code>initialised</code> becomes true.`);
+      L.push(`<code>nextround.Go("BottlesOfBeer.Round", Token{Bottles: ${b}}, resp, nil)</code> sends the request and returns at once.`);
+    }
+  }else{
+    L.push(`<code>initialised == true</code>: the dial is skipped and the existing connection is reused.`);
+    L.push(`<code>nextround.Go("BottlesOfBeer.Round", Token{Bottles: ${b}}, resp, nil)</code> sends the request and returns at once.`);
+  }
+  LZ.log.unshift(`<b>PassItAround(${b})</b><br>${L.join('<br>')}`);
+  lazyRender();
+}
+function lazyRender(){
+  $('#l_init').textContent=String(LZ.init);
+  $('#l_cl').textContent=LZ.cl?'*rpc.Client':'nil';
+  const g=$('#l_go');g.textContent=LZ.b>=0?`Call PassItAround(${LZ.b})`:'No more bottles';g.disabled=LZ.dead||LZ.b<0;
+  $('#l_miss').disabled=LZ.init;
+  $('#l_log').innerHTML=LZ.log.map(l=>`<li>${l}</li>`).join('')||'<li style="border-top:0;color:var(--muted)">Nothing called yet.</li>';
+}
+
+/* ====================== THE RING SIMULATION ====================== */
+const CEN=[[280,62],[450,290],[110,290]];
+const NR=44;
+let ringC=0;
+const LX=[90,280,470];
+class Ring{
+  constructor(root,o){
+    this.root=root;this.o=Object.assign({mode:false},o);this.dead=false;this.mult=1;this.mode='go';
+    this.uid='rg'+(++ringC);
+    this.nodes=[0,1,2].map(i=>({i,name:'ABC'[i],port:8030+10*i,next:(i+1)%3,running:false,listening:false,epoch:0,client:null,initialised:false,out:'',handlers:0,blocked:0,crashed:false,sleeping:0,sb:null}));
+    this.seq=[];this.open=[];this.tasks=0;this.started=false;this.finished=false;this.lastB=null;
+    root.innerHTML=this.html();
+    this.dyn=$('.g-dyn',root);this.dots=$('.g-dots',root);this.sq=$('.seqsvg',root);
+    const box=$('.ringbox',root);
+    box.addEventListener('click',e=>{
+      const b=e.target.closest('button[data-act]');if(!b)return;
+      if(b.dataset.act==='toggle'){const i=+b.closest('.slot').dataset.i;this.nodes[i].running?this.stop(i):this.start(i)}
+      if(b.dataset.act==='ring')this.startRing();
+      if(b.dataset.act==='reset'){this.dead=true;activeRings.push(new Ring(root,this.o))}
+    });
+    $('.spd',root).addEventListener('change',e=>{this.mult=+e.target.value});
+    const mc=$('.modechk',root);if(mc)mc.addEventListener('change',()=>{this.mode=mc.checked?'call':'go';this.render()});
+    this.render();
+  }
+  destroy(){this.dead=true}
+  edge(i,j,off){
+    const [x1,y1]=CEN[i],[x2,y2]=CEN[j];const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),ux=dx/L,uy=dy/L,px=-uy,py=ux;
+    return [[x1+ux*(NR+4)+px*off,y1+uy*(NR+4)+py*off],[x2-ux*(NR+8)+px*off,y2-uy*(NR+8)+py*off]];
+  }
+  html(){
+    let e='';
+    for(let i=0;i<3;i++){
+      const j=(i+1)%3,f=this.edge(i,j,9),r=this.edge(i,j,-9);
+      e+=`<line x1="${f[0][0]}" y1="${f[0][1]}" x2="${f[1][0]}" y2="${f[1][1]}" stroke="var(--muted)" stroke-width="1.6" marker-end="url(#${this.uid}a)"/>`;
+      e+=`<line x1="${r[0][0]}" y1="${r[0][1]}" x2="${r[1][0]}" y2="${r[1][1]}" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+    }
+    const card=i=>`<div class="slot" style="--c:hsl(${[8,212,300][i]},70%,52%)" data-i="${i}"><header><span class="nm">Process ${'ABC'[i]} <span class="mono">:${8030+10*i}</span></span><span class="chip">stopped</span><button class="btn sm" data-act="toggle">Start</button></header>`+
+      `<p class="fl mono">-this ${8030+10*i} -next localhost:${8030+10*((i+1)%3)}${i===0?' -n <input class="in nin" type="number" min="0" max="99" value="5" style="width:3.8em;padding:1px 4px" aria-label="Bottles to launch with">':''}</p><pre class="term" aria-label="Terminal of process ${'ABC'[i]}"></pre></div>`;
+    return `<div class="ringbox"><div class="cols" style="margin-top:0">
+<div><div class="fig"><svg viewBox="0 0 560 365" class="simsvg" style="display:block;width:100%;height:auto" role="img" aria-label="Ring of three processes passing the token">
+<defs><marker id="${this.uid}a" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="var(--muted)"/></marker></defs>
+${e}
+<g class="g-dyn"></g><g class="g-dots"></g></svg></div><p class="figcap">Solid arrows carry <code>Round</code> calls. Dashed lines carry replies back.</p></div>
+<div><div class="fig"><svg viewBox="0 0 560 410" class="simsvg seqsvg" style="display:block;width:100%;height:auto" role="img" aria-label="Message sequence between the processes"></svg></div><p class="figcap">Sequence of events, newest at the bottom.</p></div></div>
+<div class="simbar"><button class="btn pri sm" data-act="ring">Start ring</button><button class="btn sm" data-act="reset">Reset</button>
+<label>Speed <select class="spd"><option value="0.5">Slow</option><option value="1" selected>Normal</option><option value="3">Fast</option></select></label>
+${this.o.mode?'<label class="chk"><input type="checkbox" class="modechk"><span>Use <code>Call</code> instead of <code>Go</code></span></label>':''}</div>
+<div class="status simst" style="margin-top:8px" aria-live="polite"></div>
+<div class="cards">${[0,1,2].map(card).join('')}</div></div>`;
+  }
+  sleep(ms){return new Promise(r=>setTimeout(r,this.dead?0:(RM?Math.min(ms,60):ms/this.mult)))}
+  dot(path,label,small){
+    return new Promise(res=>{
+      if(this.dead||RM){res();return}
+      const len=Math.hypot(path[1][0]-path[0][0],path[1][1]-path[0][1]);
+      const dur=Math.max(250,len/(0.22*this.mult));
+      const NS='http://www.w3.org/2000/svg',g=document.createElementNS(NS,'g');
+      const c=document.createElementNS(NS,'circle');c.setAttribute('r',small?6:13);c.setAttribute('fill',small?'var(--muted)':'var(--chan)');c.setAttribute('stroke','#fff');c.setAttribute('stroke-width',1.5);g.appendChild(c);
+      if(!small){const t=document.createElementNS(NS,'text');t.setAttribute('text-anchor','middle');t.setAttribute('y',4);t.setAttribute('font-size',12);t.setAttribute('font-weight',700);t.setAttribute('fill','#fff');t.textContent=label;g.appendChild(t)}
+      this.dots.appendChild(g);const t0=performance.now();
+      const tick=now=>{
+        const f=Math.min(1,(now-t0)/dur);
+        g.setAttribute('transform',`translate(${path[0][0]+(path[1][0]-path[0][0])*f},${path[0][1]+(path[1][1]-path[0][1])*f})`);
+        if(f<1&&!this.dead)requestAnimationFrame(tick);else{g.remove();res()}
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+  addSeq(r){this.seq.push(r);this.render()}
+  task(d){this.tasks+=d;this.render()}
+  /* ----- process lifecycle ----- */
+  async startRing(){
+    const nin=$('.nin',this.root);if(nin&&+nin.value<1)nin.value=5;
+    await this.start(2);await this.sleep(300);await this.start(1);await this.sleep(300);this.start(0);
+  }
+  async start(i){
+    const n=this.nodes[i];if(n.running)return;
+    n.running=true;n.listening=true;n.crashed=false;n.epoch++;n.initialised=false;n.client=null;
+    const N=i===0?+$('.nin',this.root).value:0;
+    n.out+=`$ go run bottlesofbeer.go -this ${n.port} -next localhost:${this.nodes[n.next].port}${N>0?' -n '+N:''}\n`;
+    this.render();
+    const ep=n.epoch;
+    if(N>0){
+      this.started=true;this.finished=false;this.task(1);
+      const ok=await this.beers(i,N,ep);
+      if(ok)this.pass(i,N-1,false);
+      this.task(-1);
+    }
+  }
+  stop(i){
+    const n=this.nodes[i];n.running=false;n.listening=false;n.epoch++;n.client=null;n.initialised=false;n.sleeping=0;n.blocked=0;n.handlers=0;n.out+='^C\n';
+    this.render();
+  }
+  crash(i){
+    const n=this.nodes[i];
+    n.out+='panic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation]\n';
+    n.running=false;n.listening=false;n.crashed=true;n.epoch++;n.sleeping=0;n.handlers=0;n.blocked=0;
+    this.addSeq({k:'crash',lane:i,label:'panic'});
+  }
+  async beers(j,b,ep){
+    const n=this.nodes[j];n.sleeping++;n.sb=b;this.render();
+    await this.sleep(1000);
+    if(this.dead||n.epoch!==ep)return false;
+    n.sleeping=Math.max(0,n.sleeping-1);n.out+=verse(b);this.lastB=b;
+    this.addSeq({k:'verse',lane:j,label:'verse '+b});
+    return true;
+  }
+  /* PassItAround(i, b): wait=true models Call, false models Go */
+  async pass(i,b,wait){
+    const n=this.nodes[i],ep=n.epoch;this.task(1);
+    try{
+      if(!n.initialised){
+        n.initialised=true;this.addSeq({k:'dial',lane:i,label:'Dial'});
+        await this.sleep(300);if(this.dead||n.epoch!==ep)return;
+        const t=this.nodes[n.next];n.client=t.listening?{target:n.next,epoch:t.epoch}:null;
+      }
+      if(!n.client){this.crash(i);return}
+      const t=this.nodes[n.client.target];
+      if(!(t.listening&&t.epoch===n.client.epoch)){this.addSeq({k:'fail',lane:i,label:'Go: shut down'});return}
+      const call={from:i,to:t.i,b,epoch:n.client.epoch};this.open.push(call);this.render();
+      const d=this.deliver(call);
+      if(wait){n.blocked++;this.render();await d;n.blocked=Math.max(0,n.blocked-1);this.render()}
+    }finally{this.task(-1)}
+  }
+  async deliver(call){
+    this.task(1);
+    try{
+      this.addSeq({k:'call',from:call.from,to:call.to,label:`Round(${call.b})`});
+      const e=this.edge(call.from,call.to,9);
+      await this.dot(e,call.b);
+      const t=this.nodes[call.to];
+      if(!(t.listening&&t.epoch===call.epoch)){this.closeCall(call);this.addSeq({k:'fail',lane:call.to,label:'lost'});return}
+      await this.round(call);
+    }finally{this.task(-1)}
+  }
+  async round(call){
+    const j=call.to,b=call.b,n=this.nodes[j],ep=n.epoch;
+    n.handlers++;this.task(1);
+    let alive=true;
+    try{
+      alive=await this.beers(j,b,ep);
+      if(alive){
+        if(b>0)await this.pass(j,b-1,this.mode==='call');
+        else this.finished=true;
+        alive=n.epoch===ep;
+      }
+    }finally{n.handlers=Math.max(0,n.handlers-1)}
+    if(alive)await this.reply(call);else this.closeCall(call);
+    this.task(-1);
+  }
+  async reply(call){
+    const r=this.edge(call.from,call.to,-9);
+    this.addSeq({k:'reply',from:call.to,to:call.from,label:this.mode==='go'?'reply (ignored)':'reply'});
+    await this.dot([r[1],r[0]],'',true);
+    this.closeCall(call);
+  }
+  closeCall(c){const k=this.open.indexOf(c);if(k>=0)this.open.splice(k,1);this.render()}
+
+  render(){
+    if(!this.dyn)return;
+    let d='';
+    this.nodes.forEach((n,i)=>{
+      const [x,y]=CEN[i];
+      const st=n.crashed?'var(--warn)':n.running?'var(--accent)':'var(--line)';
+      d+=`<circle cx="${x}" cy="${y}" r="${NR}" fill="${n.handlers||n.sleeping?'var(--soft)':'var(--panel)'}" stroke="${st}" stroke-width="${n.running?3.5:2}" ${n.running?'':'stroke-dasharray="5 4"'}/>`;
+      d+=`<text class="t1" x="${x}" y="${y}" text-anchor="middle">${n.name}</text><text class="t2" x="${x}" y="${y+17}" text-anchor="middle">:${n.port}</text>`;
+      if(n.handlers>0)d+=`<circle cx="${x+34}" cy="${y-32}" r="11" fill="var(--accent)"/><text x="${x+34}" y="${y-28}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-ink)">${n.handlers}</text>`;
+      let tag=n.crashed?'crashed':!n.running?'stopped':n.blocked?'waiting for reply':n.sleeping?`sleeping in Beers(${n.sb})`:'listening';
+      const bad=n.crashed;
+      const tx=i===0?x+56:x,ty=i===0?y+4:y+NR+20,an=i===0?'start':'middle';
+      d+=`<text class="${bad?'tw':'t2'}" x="${tx}" y="${ty}" text-anchor="${an}">${tag}</text>`;
+    });
+    this.dyn.innerHTML=d;
+    // sequence diagram
+    const rows=this.seq.slice(-16),y0=52,rh=21.5;
+    let q='';
+    [0,1,2].forEach(i=>{q+=`<text class="t1" x="${LX[i]}" y="24" text-anchor="middle" style="font-size:16px">${'ABC'[i]}</text><line x1="${LX[i]}" x2="${LX[i]}" y1="32" y2="404" stroke="var(--line)" stroke-width="1.5"/>`});
+    rows.forEach((r,k)=>{
+      const y=y0+k*rh;
+      if(r.k==='call'||r.k==='reply'){
+        const x1=LX[r.from],x2=LX[r.to],dir=x2>x1?-6:6,col=r.k==='call'?'var(--accent)':'var(--muted)';
+        const sg=x2>x1?1:-1;
+        q+=`<line x1="${x1}" y1="${y}" x2="${x2-sg*6}" y2="${y}" stroke="${col}" stroke-width="1.8" ${r.k==='reply'?'stroke-dasharray="4 3"':''}/><polygon points="${x2},${y} ${x2-sg*9},${y-4.5} ${x2-sg*9},${y+4.5}" fill="${col}"/>`;
+        q+=`<text class="${r.k==='call'?'ta':'t2'}" x="${(x1+x2)/2}" y="${y-4}" text-anchor="middle">${esc(r.label)}</text>`;
+      }else if(r.k==='verse'){
+        q+=`<circle cx="${LX[r.lane]}" cy="${y}" r="5" fill="var(--chan)"/><text class="tm" x="${LX[r.lane]+(r.lane===2?-10:10)}" y="${y+4}" text-anchor="${r.lane===2?'end':'start'}">${esc(r.label)}</text>`;
+      }else if(r.k==='dial'){
+        q+=`<rect x="${LX[r.lane]-4.5}" y="${y-4.5}" width="9" height="9" fill="var(--mapc)" transform="rotate(45 ${LX[r.lane]} ${y})"/><text class="t2" x="${LX[r.lane]+(r.lane===2?-10:10)}" y="${y+4}" text-anchor="${r.lane===2?'end':'start'}">${r.label}</text>`;
+      }else{
+        q+=`<text class="tw" x="${LX[r.lane]}" y="${y+4}" text-anchor="middle" style="font-size:14px">✕</text><text class="tw" x="${LX[r.lane]+(r.lane===2?-12:12)}" y="${y+4}" text-anchor="${r.lane===2?'end':'start'}">${esc(r.label)}</text>`;
+      }
+    });
+    this.sq.innerHTML=q;
+    // status
+    const blocked=this.nodes.reduce((a,n)=>a+n.blocked,0);
+    let st=`RPC calls awaiting a reply: <b>${this.open.length}</b>. Handler goroutines blocked on a reply: <b>${blocked}</b>.`;
+    if(this.finished)st+=` <span class="good">Round complete.</span> The processes are still running: <code>rpc.Accept</code> never returns.`;
+    else if(this.started&&this.tasks===0){
+      const crashed=this.nodes.some(n=>n.crashed);
+      st+=` <span class="bad">Stalled${this.lastB!==null?' after verse '+this.lastB:''}.</span> ${crashed?'A process crashed.':'A call was lost.'} Nobody holds the token, and nothing will send it again.`;
+    }
+    $('.simst',this.root).innerHTML=st;
+    // cards
+    $$('.slot',this.root).forEach(c=>{
+      const n=this.nodes[+c.dataset.i];
+      const chip=$('.chip',c);chip.textContent=n.crashed?'crashed':n.running?'running':'stopped';chip.className='chip'+(n.running?' on':n.crashed?' bad':'');
+      const b=$('button',c);b.textContent=n.running?'Stop':'Start';
+      const ni=$('.nin',c);if(ni)ni.disabled=n.running;
+      const t=$('.term',c);if(t.textContent!==n.out){t.textContent=n.out;t.scrollTop=t.scrollHeight}
+    });
+  }
+}
+let activeRings=[];
+
+/* ====================== STEPS & NAV ====================== */
+let step=0;
+function buildRail(){
+  const ol=$('#steps');
+  STEPS.forEach((t,i)=>{const li=document.createElement('li');li.innerHTML=`<button type="button" data-step="${i}"><span class="n">${i+1}</span><span>${t}</span></button>`;ol.appendChild(li)});
+  ol.addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(+b.dataset.step)});
+  $('#back').addEventListener('click',()=>go(step-1));
+  $('#fwd').addEventListener('click',()=>go(step+1));
+  $('#rn').addEventListener('input',ringBuilder);$('#rb').addEventListener('input',ringBuilder);
+  $('#l_go').addEventListener('click',lazyCall);$('#l_rst').addEventListener('click',lazyReset);
+}
+function go(i){
+  i=Math.max(0,Math.min(STEPS.length-1,i));step=i;
+  activeRings.forEach(r=>r.destroy());activeRings=[];
+  $$('.step').forEach((s,j)=>s.classList.toggle('on',j===i));
+  $$('#steps button').forEach((b,j)=>{if(j===i)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});
+  $('#back').disabled=i===0;$('#fwd').disabled=i===STEPS.length-1;
+  $('#fwd').textContent=i<STEPS.length-1?'Next: '+STEPS[i+1]:'Done';
+  enter(i);
+  window.scrollTo({top:0,behavior:RM?'auto':'smooth'});
+}
+function enter(i){
+  if(i===0){
+    codeBlock('code0','note0',[
+      ['thisPort := flag.String("this", "8030", "Port to listen on")','The port <em>this</em> process listens on. Every process in the ring needs a different one when they share a machine.'],
+      ['flag.StringVar(&nextAddr, "next", "localhost:8040", "IP:Port string for next member of the round.")','The address of the next process in the ring. This is all a process knows about the rest of the ring. It is stored in the global <code>nextAddr</code>.'],
+      ['bottles := flag.Int("n", 0, "Bottles of Beer (launches round)")','Zero for everyone except the process that starts the song. Only a value above zero starts a round.'],
+      ['flag.Parse()']
+    ]);
+    ringBuilder();
+  }
+  if(i===1){
+    codeBlock('code1','note1',[
+      ['type BottlesOfBeer struct {}','An empty type. It exists only to carry methods. Its name becomes the first half of the RPC name.'],
+      ['type Token struct {','The data passed between processes. It is what the caller sends as the request.'],
+      ['\tBottles int','Exported (capital B), so it is encoded and sent. A lower-case field would be silently left out.'],
+      ['}'],
+      [''],
+      ['func (b *BottlesOfBeer) Round(intoken Token, outtoken *Token) (err error) {','The remote procedure. It becomes callable as <code>"BottlesOfBeer.Round"</code>. <code>outtoken</code> is the reply slot. This program never fills it, but the signature requires it.'],
+      ['\t// ...'],
+      ['}'],
+      [''],
+      ['rpc.Register(&BottlesOfBeer{})','Makes every suitable method of this type callable by name. The returned error is ignored here.'],
+      ['listener, _ := net.Listen("tcp", ":"+*thisPort)','Open a TCP port. Connections can queue up at the operating system from this moment.'],
+      ['defer listener.Close()'],
+      ['rpc.Accept(listener)','Serve forever. For each incoming connection it starts a goroutine, and each request on it is handled in its own goroutine, so several calls can be in progress at once. It never returns.']
+    ]);
+    sigRender();
+  }
+  if(i===2){
+    codeBlock('code2','note2',[
+      ['var initialised = false'],
+      ['var nextround *rpc.Client','The connection to the next process, kept for reuse. It is nil until first needed.'],
+      [''],
+      ['func PassItAround(bottles int) {'],
+      ['\treqs := Token{Bottles: bottles}','The request to send: the new bottle count.'],
+      ['\tresp := new(Token)','Somewhere for the reply to go. It is never read.'],
+      ['\tif initialised == false {','Lazy set-up. The first call connects. Later calls skip this block.'],
+      ['\t\tnextround, _ = rpc.Dial("tcp", nextAddr)','Open a TCP connection to the next process and wrap it as an RPC client. If nothing is listening there, this returns a nil client and an error, and the error is discarded.'],
+      ['\t\tinitialised = true','Set even if the dial failed, so a failed dial is never retried.'],
+      ['\t}'],
+      ['\tnextround.Go("BottlesOfBeer.Round", reqs, resp, nil)','Start the call and return immediately. The name is <code>Type.Method</code> as registered on the far side. Passing <code>nil</code> for the done channel lets the library make its own, and nobody reads it.'],
+      ['}']
+    ]);
+    lazyReset();
+  }
+  if(i===3){
+    codeBlock('code3','note3',[
+      ['func Beers(i int) {'],
+      ['\ttime.Sleep(1*time.Second)','A one second pause so each verse is visible. It happens <em>before</em> printing.'],
+      ['\tif i > 1 {','Several bottles: plural verse. Then <code>i == 1</code> gets the singular verse, and zero the final one.'],
+      ['\t\tfmt.Printf("%v bottles of beer on the wall, ...")'],
+      ['\t}'],
+      ['}'],
+      [''],
+      ['func (b *BottlesOfBeer) Round(intoken Token, outtoken *Token) (err error) {','Runs on the <em>receiving</em> process whenever the previous one calls it. It runs in its own goroutine.'],
+      ['\tbottles := intoken.Bottles','Take the count out of the request.'],
+      ['\tBeers(bottles)','Sleep a second, sing the verse.'],
+      ['\tif bottles > 0 {','The stopping condition. At zero the verse was the last one and nothing is passed on.'],
+      ['\t\tPassItAround(bottles-1)','Hand the count, one lower, to the next process. With <code>Go</code> this returns at once.'],
+      ['\t}'],
+      ['\treturn','The handler is finished, so net/rpc sends a reply to the caller. With <code>Go</code> the caller isn\'t waiting for it.'],
+      ['}']
+    ]);
+    activeRings.push(new Ring($('#ring3'),{mode:true}));
+  }
+  if(i===4){
+    codeBlock('code4','note4',[
+      ['if *bottles > 0 {','Only the starter has a non-zero <code>-n</code>.'],
+      ['\tBeers(*bottles)','The starter sings the first verse itself: <code>n</code> bottles. This takes a second.'],
+      ['\tgo PassItAround(*bottles-1)','Then it dials the next process and sends <code>n-1</code>, in a goroutine so that main can carry on. If the next process isn\'t listening yet, the dial fails and the next line panics. That is why the starter goes last.'],
+      ['}'],
+      ['rpc.Accept(listener)','Now serve, so that when the token comes all the way round, this process can receive it too.'],
+      [''],
+      ['// Inside PassItAround, the two risky lines:'],
+      ['nextround, _ = rpc.Dial("tcp", nextAddr)','Fails silently if the next process is down: <code>nextround</code> stays nil.'],
+      ['nextround.Go("BottlesOfBeer.Round", reqs, resp, nil)','On a nil client this panics. On a closed connection it fails with an error that lands in the <code>*Call</code> nobody reads, so the round stops without any message.']
+    ]);
+    activeRings.push(new Ring($('#ring4'),{}));
+  }
+  if(i===5)codeBlock('code5','note5',[
+    ['var initialised = false'],
+    ['var nextround *rpc.Client'],
+    ['var nextAddr string','Set from the <code>-next</code> flag.'],
+    [''],
+    ['func Beers(i int) {','Sleep, then print one verse.'],
+    ['\ttime.Sleep(1*time.Second)'],
+    ['\t// print the verse for i'],
+    ['}'],
+    [''],
+    ['func PassItAround(bottles int) {','Step 3: dial lazily, then call <code>Round</code> on the next process without waiting.'],
+    ['\t// ...dial once, then nextround.Go("BottlesOfBeer.Round", ...)'],
+    ['}'],
+    [''],
+    ['type BottlesOfBeer struct {}'],
+    ['type Token struct { Bottles int }','Step 2: the registered type and the data it carries.'],
+    [''],
+    ['func (b *BottlesOfBeer) Round(intoken Token, outtoken *Token) (err error) {','Step 4: sing, then pass the count on, until it reaches zero.'],
+    ['\tBeers(intoken.Bottles)'],
+    ['\tif intoken.Bottles > 0 { PassItAround(intoken.Bottles-1) }'],
+    ['\treturn'],
+    ['}'],
+    [''],
+    ['func main() {'],
+    ['\t// flags: -this, -next, -n','Step 1.'],
+    ['\trpc.Register(&BottlesOfBeer{})'],
+    ['\tlistener, _ := net.Listen("tcp", ":"+*thisPort)'],
+    ['\tdefer listener.Close()'],
+    ['\tif *bottles > 0 {','Step 5: only the starter does this.'],
+    ['\t\tBeers(*bottles)'],
+    ['\t\tgo PassItAround(*bottles-1)'],
+    ['\t}'],
+    ['\trpc.Accept(listener)','Serve calls from the previous process, forever.'],
+    ['}']
+  ]);
+}
+
+/* ---------- boot ---------- */
+buildRail();
+go(0);
+</script>
+</body>
+</html>
