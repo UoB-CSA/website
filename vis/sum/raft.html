@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Replicated control plane lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0EC; --surface:#F8FAF7; --surface2:#E3E8E2; --ink:#17212B; --muted:#56636F; --line:#C6CFC8;
+  --indigo:#3D4FA3; --indigo-soft:#DDE2F5; --green:#1F7A4D; --green-soft:#D6EBDF;
+  --amber:#9A6212; --amber-soft:#F4E6C8; --rose:#B3261E; --rose-soft:#F6D9D6;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12171C; --surface:#1A2129; --surface2:#242D37; --ink:#E6EBEF; --muted:#9AA7B3; --line:#33404C;
+    --indigo:#93A5F2; --indigo-soft:#27304F; --green:#63C795; --green-soft:#1D3A2C;
+    --amber:#E3B458; --amber-soft:#40321A; --rose:#F28F87; --rose-soft:#44221F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12171C; --surface:#1A2129; --surface2:#242D37; --ink:#E6EBEF; --muted:#9AA7B3; --line:#33404C;
+  --indigo:#93A5F2; --indigo-soft:#27304F; --green:#63C795; --green-soft:#1D3A2C;
+  --amber:#E3B458; --amber-soft:#40321A; --rose:#F28F87; --rose-soft:#44221F;
+  color-scheme: dark;
+}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:20px;margin:0 0 4px;font-weight:700}
+h3{font-size:15px;margin:0 0 6px;font-weight:700}
+p{margin:0 0 10px}
+.lede{color:var(--muted);max-width:70ch}
+.tabs{display:flex;gap:4px;overflow-x:auto;margin:18px 0 20px;border-bottom:2px solid var(--line)}
+.tabs button{background:none;border:0;color:var(--muted);font:inherit;font-weight:600;padding:9px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;border-radius:6px 6px 0 0}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--indigo)}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--indigo);outline-offset:2px}
+.btn{font:inherit;font-size:13px;font-weight:600;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 11px;cursor:pointer}
+.btn:hover{border-color:var(--indigo)}
+.btn.pri{background:var(--indigo);color:#fff;border-color:transparent}
+:root[data-theme="dark"] .btn.pri{color:#10151f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.pri{color:#10151f}}
+.btn.bad{border-color:var(--rose);color:var(--rose)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid2{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:24px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.sec{padding:16px 0;border-top:1px solid var(--line)}
+.sec:first-child{border-top:0;padding-top:0}
+.note{font-size:13px;color:var(--muted)}
+select{font:inherit;font-size:13px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;background:var(--surface2);color:var(--muted)}
+.pill.good{background:var(--green-soft);color:var(--green)}
+.pill.bad{background:var(--rose-soft);color:var(--rose)}
+.pill.warn{background:var(--amber-soft);color:var(--amber)}
+.pill.ind{background:var(--indigo-soft);color:var(--indigo)}
+svg text{font-family:inherit}
+.diag{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:700;color:var(--muted);font-size:12.5px}
+.chip{display:inline-block;min-width:24px;text-align:center;font-size:12px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--indigo);color:#fff;margin:1px 2px 1px 0;border:1px dashed transparent;font-variant-numeric:tabular-nums}
+:root[data-theme="dark"] .chip{color:#10151f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .chip{color:#10151f}}
+.chip.unc{background:transparent;color:var(--ink);border-color:var(--muted)}
+.chip.noop{background:var(--surface2);color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin:8px 0}
+.events{list-style:none;margin:0;padding:0;max-height:210px;overflow:auto;font-size:13.5px;border-top:1px solid var(--line)}
+.events li{padding:5px 0;border-bottom:1px solid var(--line)}
+.events .g{display:inline-block;min-width:58px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.events li.good{color:var(--green)} .events li.bad{color:var(--rose)} .events li.warn{color:var(--amber)}
+.big{font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+canvas{width:100%;height:auto;image-rendering:pixelated;border:1px solid var(--line);border-radius:6px;background:var(--surface2);display:block}
+.spark{width:100%;height:46px;display:block}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13.5px;margin:10px 0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:600}
+.scen{display:flex;flex-direction:column;gap:6px}
+.scen .btn{text-align:left}
+.scen .btn[aria-pressed="true"]{border-color:var(--indigo);background:var(--indigo-soft)}
+.step{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:start}
+.ico{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:var(--surface2);color:var(--muted)}
+.ico.pass{background:var(--green-soft);color:var(--green)} .ico.fail{background:var(--rose-soft);color:var(--rose)}
+.ico.off{background:var(--amber-soft);color:var(--amber)}
+.env{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.env dt{color:var(--muted)} .env dd{margin:0;font-weight:600;word-break:break-all}
+.env dd.chg{color:var(--rose);text-decoration:underline wavy}
+.banner{padding:10px 12px;border-radius:8px;font-weight:600;margin:10px 0}
+.banner.good{background:var(--green-soft);color:var(--green)} .banner.bad{background:var(--rose-soft);color:var(--rose)} .banner.warn{background:var(--amber-soft);color:var(--amber)}
+.checks{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.checks label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.checks input{margin-top:4px;accent-color:var(--indigo)}
+.bar{height:20px;border-radius:4px;background:var(--indigo);min-width:3px}
+.bar.g{background:var(--green)} .bar.a{background:var(--amber)} .bar.r{background:var(--rose)}
+.bars{display:grid;grid-template-columns:150px 1fr 90px;gap:6px 10px;align-items:center;font-size:13.5px}
+.bars span.v{font-variant-numeric:tabular-nums;font-weight:600}
+.sl{display:grid;grid-template-columns:minmax(150px,210px) 1fr 70px;gap:8px;align-items:center;font-size:13.5px;margin:4px 0}
+.sl input[type=range]{width:100%;accent-color:var(--indigo)}
+.sl output{font-weight:600;font-variant-numeric:tabular-nums}
+textarea{width:100%;min-height:150px;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+tr.sel td{background:var(--indigo-soft)}
+tr.clk{cursor:pointer}
+tr.clk:hover td{background:var(--surface2)}
+ul.tight{margin:4px 0 10px;padding-left:20px}
+details{margin:8px 0} summary{cursor:pointer;font-weight:600}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Replicated control plane lab</h1>
+  <p class="lede">An interactive companion to the Game of Life extension “Secure and Fault-Tolerant Replicated Control Plane”. The models are deliberately simplified for building intuition. They are not a Raft implementation and not security-grade code, and the numbers in the timing tab come from a model, not a measurement.</p>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <main id="view"></main>
+</div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ============================================================
+   1. Simplified Raft engine (terms, elections, log, quorum, fencing)
+   ============================================================ */
+const BW = 24, BH = 16;
+function newBoard(){
+  const b = new Uint8Array(BW * BH);
+  [[1,0],[2,0],[0,1],[1,1],[1,2]].forEach(([x,y]) => b[(6 + y) * BW + 11 + x] = 1); // R-pentomino
+  return b;
+}
+function stepBoard(b){
+  const n = new Uint8Array(BW * BH);
+  for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++){
+    let c = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+      if (dx || dy) c += b[((y + dy + BH) % BH) * BW + (x + dx + BW) % BW];
+    }
+    const a = b[y * BW + x];
+    n[y * BW + x] = (a && (c === 2 || c === 3)) || (!a && c === 3) ? 1 : 0;
+  }
+  return n;
+}
+const say = (c, m, kind = '') => { c.events.unshift({ g: c.job.gen, m, kind }); if (c.events.length > 40) c.events.pop(); };
+const clone = log => log.map(e => ({ ...e }));
+const mainGroup = c => c.nodes.filter(x => x.alive && !x.isolated);
+const lastInfo = x => ({ term: x.log.length ? x.log[x.log.length - 1].term : 0, len: x.log.length });
+const moreUpToDate = (a, b) => { const A = lastInfo(a), B = lastInfo(b); return A.term !== B.term ? A.term > B.term : A.len > B.len; };
+
+function makeCluster(n){
+  const c = { n, quorum: Math.floor(n / 2) + 1, seq: 0, events: [], stall: 0, started: false, status: 'Running', lastSend: null,
+    job: { gen: 0, board: newBoard(), hist: [0] },
+    nodes: Array.from({ length: n }, (_, i) => ({ id: i + 1, role: 'follower', term: 0, alive: true, isolated: false, log: [], commit: 0 })) };
+  maybeElect(c);
+  c.started = true;
+  c.events = [{ g: 0, m: 'Cluster started: node 1 won the first election (term 1).', kind: 'good' }];
+  return c;
+}
+function syncFrom(c, leader, group){
+  for (const f of group){ if (f === leader) continue; f.log = clone(leader.log); f.term = leader.term; f.commit = leader.commit; f.role = 'follower'; }
+}
+function maybeElect(c){
+  const G = mainGroup(c);
+  if (!G.length) return;
+  const maxTerm = Math.max(...G.map(x => x.term));
+  if (G.find(x => x.role === 'leader' && x.term >= maxTerm)) return;
+  if (G.length < c.quorum){
+    G.forEach(x => { if (x.role !== 'leader') x.role = 'candidate'; });
+    say(c, `No quorum: only ${G.length} of ${c.n} nodes can talk to each other (need ${c.quorum}). No leader can be elected, so the cluster stalls rather than risk conflicting decisions.`, 'bad');
+    return;
+  }
+  let cand = G[0];
+  for (const x of G) if (moreUpToDate(x, cand)) cand = x;
+  const term = maxTerm + 1;
+  G.forEach(x => { if (x.role === 'leader') x.role = 'follower'; });
+  cand.role = 'leader'; cand.term = term;
+  cand.log.push({ term, type: 'noop', label: '∅' });
+  syncFrom(c, cand, G);
+  cand.commit = cand.log.length; G.forEach(x => { x.commit = cand.commit; });
+  if (c.started) c.stall = 2;
+  say(c, `Election: node ${cand.id} became leader for term ${term} with votes from ${G.length} of ${c.n} nodes.`, 'good');
+}
+function crash(c, id){ const x = c.nodes[id - 1]; if (!x.alive) return; x.alive = false; x.role = 'down'; say(c, `Node ${id} crashed.`, 'bad'); maybeElect(c); }
+function recover(c, x){
+  const G = mainGroup(c);
+  const leader = G.filter(y => y.role === 'leader' && y !== x).sort((a, b) => b.term - a.term)[0];
+  if (leader){
+    if (x.role === 'leader' && x.term < leader.term){
+      const lost = x.log.length - x.commit;
+      say(c, `Node ${x.id} was a stale leader (term ${x.term}). It sees term ${leader.term}, steps down, and discards ${lost} uncommitted entr${lost === 1 ? 'y' : 'ies'}.`, 'warn');
+    } else say(c, `Node ${x.id} catches up from leader node ${leader.id}.`);
+    x.role = 'follower'; x.log = clone(leader.log); x.term = leader.term; x.commit = leader.commit;
+  } else maybeElect(c);
+}
+function restart(c, id){
+  const x = c.nodes[id - 1]; if (x.alive) return;
+  x.alive = true; x.role = 'follower';
+  say(c, `Node ${id} restarted with its saved log (term ${x.term}).`);
+  if (!x.isolated) recover(c, x);
+}
+function isolate(c, id){
+  const x = c.nodes[id - 1]; if (!x.alive || x.isolated) return;
+  x.isolated = true;
+  say(c, `Node ${id} lost its network connection (still running, still believes it is ${x.role === 'leader' ? 'the leader' : 'a ' + x.role}).`, 'warn');
+  maybeElect(c);
+}
+function heal(c, id){ const x = c.nodes[id - 1]; if (!x.isolated) return; x.isolated = false; say(c, `Node ${id} reconnected.`); if (x.alive) recover(c, x); }
+const TYPES = { alloc: ['A', 'Allocate work'], pause: ['P', 'Pause'], resume: ['R', 'Resume'], checkpoint: ['K', 'Checkpoint'] };
+function sendCommand(c, id, type){
+  const x = c.nodes[id - 1];
+  if (!x.alive || x.role !== 'leader') return say(c, `Node ${id} is not a leader, so it rejects the command and tells the client to retry elsewhere.`, 'warn');
+  const label = TYPES[type][0] + (++c.seq);
+  const G = x.isolated ? [x] : mainGroup(c);
+  const higher = G.find(y => y !== x && y.term > x.term);
+  if (higher){ x.role = 'follower'; x.term = higher.term; return say(c, `Node ${id} tried to replicate “${label}” but a peer has a higher term (${higher.term}). Stale leader rejected; it steps down.`, 'warn'); }
+  x.log.push({ term: x.term, type, label, gen: c.job.gen });
+  G.forEach(y => { if (y !== x){ y.log = clone(x.log); y.term = x.term; y.role = 'follower'; } });
+  c.lastSend = { from: id, to: G.filter(y => y !== x).map(y => y.id), at: Date.now() };
+  if (G.length >= c.quorum){
+    x.commit = x.log.length; G.forEach(y => { y.commit = x.commit; });
+    say(c, `“${label}” (${TYPES[type][1].toLowerCase()}) replicated to ${G.length} of ${c.n} nodes (quorum ${c.quorum}): COMMITTED.`, 'good');
+  } else say(c, `“${label}” is only on ${G.length} of ${c.n} nodes (quorum ${c.quorum}): NOT committed. It must not be acted on.`, 'bad');
+}
+function leaderNode(c){ const g = mainGroup(c); if (g.length < c.quorum) return null; return g.find(x => x.role === 'leader') || null; }
+function jobState(c){
+  let best = null;
+  for (const x of c.nodes) if (x.alive && (!best || x.commit > best.commit)) best = x;
+  let paused = false, ckpt = null, allocs = 0;
+  if (best) for (let i = 0; i < best.commit; i++){
+    const e = best.log[i];
+    if (e.type === 'pause') paused = true;
+    if (e.type === 'resume') paused = false;
+    if (e.type === 'checkpoint') ckpt = { gen: e.gen, term: e.term };
+    if (e.type === 'alloc') allocs++;
+  }
+  return { paused, ckpt, allocs };
+}
+function tick(c){
+  const L = leaderNode(c), js = jobState(c);
+  if (!L){ c.status = 'No leader: control plane stalled'; c.job.hist.push(c.job.gen); }
+  else if (c.stall > 0){ c.stall--; c.status = 'Leader elected, workers re-attaching'; c.job.hist.push(c.job.gen); }
+  else if (js.paused){ c.status = 'Paused by a committed command'; c.job.hist.push(c.job.gen); }
+  else { c.job.gen++; c.job.board = stepBoard(c.job.board); c.status = 'Running'; c.job.hist.push(c.job.gen); }
+  if (c.job.hist.length > 80) c.job.hist.shift();
+}
+const adv = (c, k) => { for (let i = 0; i < k; i++) tick(c); };
+
+/* ============================================================
+   2. Security gate engine (toy MAC, switchable controls)
+   ============================================================ */
+function tmac(key, msg){ // cyrb53: a toy hash for illustration only, NOT cryptographic
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57; const s = key + '|' + msg;
+  for (let i = 0; i < s.length; i++){ const ch = s.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+const WINDOW = 10, CKEY = 'k-cluster', JOB = 'gol-7';
+const ckptMsg = k => `${k.job}|${k.gen}|${k.hash}|${k.term}`;
+const mkCkpt = (gen, term) => { const k = { job: JOB, gen, term, hash: tmac('data', 'board@' + gen).slice(0, 10) }; k.mac = tmac(CKEY, ckptMsg(k)); return k; };
+function newSec(){
+  return { term: 2, leader: 'R2', now: 1000,
+    keys: { R1: 'k-r1', R2: 'k-r2', R3: 'k-r3', W1: 'k-w1', W2: 'k-w2', W3: 'k-w3' },
+    members: ['R1', 'R2', 'R3', 'W1', 'W2', 'W3'],
+    lastSeq: { R1: 40, R2: 0 }, applied: [], audit: [], lastEnv: null, restored: null,
+    latest: mkCkpt(120, 2), old: mkCkpt(60, 1),
+    controls: { auth: true, mac: true, fresh: true, fence: true, ckpt: true } };
+}
+const cmdMsg = e => `${e.from}|${e.term}|${e.seq}|${e.ts}|${e.cmd}`;
+function mkCmd(s, from, term, seq, ts, cmd){ const e = { kind: 'cmd', from, term, seq, ts, cmd }; e.mac = tmac(s.keys[from], cmdMsg(e)); return e; }
+
+const SCEN = {
+  legit:  { label: 'Legitimate command (control case)', attack: false,
+            text: 'R2, the current leader in term 2, tells W1 to take rows 0–7.' },
+  join:   { label: 'Unauthorised node tries to join', attack: true, text: 'An unknown process X9 asks to join as a replica.',
+            hit: 'X9 is now a cluster member: it can vote and receive work.' },
+  tamper: { label: 'Command modified in transit', attack: true, text: 'An attacker on the wire changes the command text of a genuine message from R2.',
+            hit: 'TERMINATE was applied instead of the original command: the job is killed by a modified message.' },
+  dup:    { label: 'Duplicated command', attack: true, text: 'The network (or an attacker) delivers the same genuine message a second time.',
+            hit: 'The allocation was applied twice: rows 0–7 are double-assigned.' },
+  late:   { label: 'Delayed command', attack: true, text: 'A genuine PAUSE from R2 arrives 45 s after it was sent.',
+            hit: 'A PAUSE issued 45 s ago freezes a job that has since moved on.' },
+  stale:  { label: 'Stale former leader', attack: true, text: 'R1 was leader in term 1, was cut off, and still sends a correctly signed command.',
+            hit: 'W3 is given rows 0–7 that R2 already assigned to W1: two leaders, conflicting decisions.' },
+  ckok:   { label: 'Valid checkpoint metadata (control case)', attack: false, text: 'Restore from the latest checkpoint the cluster committed (generation 120).' },
+  cktamper:{ label: 'Checkpoint metadata modified', attack: true, text: 'The generation number is changed from 120 to 180; the hash and tag are untouched.',
+            hit: 'The job restores from a checkpoint labelled generation 180 whose contents do not match: silent corruption.' },
+  ckstale:{ label: 'Stale checkpoint metadata', attack: true, text: 'A genuine, correctly signed checkpoint record from generation 60 is replayed.',
+            hit: 'The job rolls back to generation 60: 60 generations are silently repeated or the result diverges.' }
+};
+function buildEnv(s, id){
+  const nextSeq = (s.lastSeq.R2 || 0) + 1;
+  switch (id){
+    case 'legit': return { env: mkCmd(s, 'R2', 2, nextSeq, s.now, 'ALLOC W1 rows 0–7'), changed: [] };
+    case 'join': { const e = { kind: 'join', from: 'X9', term: 2, seq: 1, ts: s.now, cmd: 'JOIN as replica R4' }; e.mac = tmac('k-attacker', cmdMsg(e)); return { env: e, changed: [] }; }
+    case 'tamper': { const e = mkCmd(s, 'R2', 2, nextSeq, s.now, 'ALLOC W1 rows 0–7'); e.cmd = 'TERMINATE job'; return { env: e, changed: ['cmd'] }; }
+    case 'dup': return { env: { ...s.lastEnv }, changed: [] };
+    case 'late': return { env: mkCmd(s, 'R2', 2, nextSeq, s.now - 45, 'PAUSE'), changed: [] };
+    case 'stale': return { env: mkCmd(s, 'R1', 1, 41, s.now, 'ALLOC W3 rows 0–7'), changed: [] };
+    case 'ckok': return { env: { kind: 'ckpt', from: 'R2', ckpt: { ...s.latest }, cmd: 'RESTORE' }, changed: [] };
+    case 'cktamper': return { env: { kind: 'ckpt', from: 'R2', ckpt: { ...s.latest, gen: 180 }, cmd: 'RESTORE' }, changed: ['gen'] };
+    case 'ckstale': return { env: { kind: 'ckpt', from: 'R2', ckpt: { ...s.old }, cmd: 'RESTORE' }, changed: [] };
+  }
+}
+function secVerify(s, e){
+  const C = s.controls, steps = []; let ok = true;
+  const add = (name, applies, enabled, test) => {
+    if (!applies){ steps.push({ name, st: 'na', note: 'Not applicable to this kind of message.' }); return; }
+    if (!ok){ steps.push({ name, st: 'skip', note: 'Not reached: an earlier check already rejected the message.' }); return; }
+    if (!enabled){ steps.push({ name, st: 'off', note: 'Control switched off: this check is not performed.' }); return; }
+    const r = test(); steps.push({ name, st: r.ok ? 'pass' : 'fail', note: r.note }); if (!r.ok) ok = false;
+  };
+  const isCmd = e.kind === 'cmd' || e.kind === 'join', isCk = e.kind === 'ckpt';
+  add('1 · Is the sender a known, authenticated member?', true, C.auth, () => s.members.includes(e.from)
+    ? { ok: true, note: `${e.from} holds a certificate issued by the cluster CA.` }
+    : { ok: false, note: `${e.from} has no certificate from the cluster CA. Connection refused.` });
+  add('2 · Is the message authentic and unmodified?', isCmd, C.mac, () => {
+    const key = s.keys[e.from];
+    if (!key) return { ok: false, note: `No shared key is registered for ${e.from}, so its tag cannot be verified.` };
+    return tmac(key, cmdMsg(e)) === e.mac ? { ok: true, note: 'Tag matches the message contents.' } : { ok: false, note: 'Tag mismatch: the message changed after it was signed.' };
+  });
+  add('3 · Is the message fresh and not a repeat?', e.kind === 'cmd', C.fresh, () => {
+    const age = s.now - e.ts, last = s.lastSeq[e.from] || 0;
+    if (age > WINDOW) return { ok: false, note: `Message is ${age} s old; the accepted window is ${WINDOW} s.` };
+    if (e.seq <= last) return { ok: false, note: `Sequence ${e.seq} from ${e.from} was already seen (last accepted: ${last}).` };
+    return { ok: true, note: `Age ${age} s and sequence ${e.seq} is new.` };
+  });
+  add('4 · Does the sender hold leadership for the current term?', e.kind === 'cmd', C.fence, () => {
+    if (e.term < s.term) return { ok: false, note: `Term ${e.term} is older than the current term ${s.term}. ${e.from} is a stale former leader.` };
+    if (e.from !== s.leader) return { ok: false, note: `${e.from} is not the leader of term ${s.term}.` };
+    return { ok: true, note: `${e.from} is the leader of term ${s.term}.` };
+  });
+  add('5 · Is the checkpoint metadata bound to its contents and the latest?', isCk, C.ckpt, () => {
+    if (tmac(CKEY, ckptMsg(e.ckpt)) !== e.ckpt.mac) return { ok: false, note: 'Tag mismatch: job, generation, hash or term was altered after signing.' };
+    if (e.ckpt.gen < s.latest.gen) return { ok: false, note: `Generation ${e.ckpt.gen} is older than the latest committed checkpoint (${s.latest.gen}).` };
+    return { ok: true, note: `Tag valid and generation ${e.ckpt.gen} equals the latest committed checkpoint.` };
+  });
+  return { steps, accepted: ok };
+}
+function secRun(s, id){
+  let pre = null;
+  if (id === 'dup' && !s.lastEnv) pre = secRun(s, 'legit');
+  s.now += 1;
+  const { env, changed } = buildEnv(s, id);
+  const v = secVerify(s, env), meta = SCEN[id];
+  const failed = v.steps.find(x => x.st === 'fail');
+  if (v.accepted){
+    if (env.kind === 'cmd'){ s.applied.push(`${env.cmd}  (from ${env.from}, term ${env.term}, seq ${env.seq})`); s.lastSeq[env.from] = Math.max(s.lastSeq[env.from] || 0, env.seq); if (id === 'legit') s.lastEnv = { ...env }; }
+    if (env.kind === 'join'){ s.members.push(env.from); }
+    if (env.kind === 'ckpt'){ s.restored = { gen: env.ckpt.gen, label: id }; }
+  }
+  const result = { id, env, changed, steps: v.steps, accepted: v.accepted, blockedBy: failed ? failed.name : null, pre };
+  s.audit.unshift(`${v.accepted ? 'ACCEPT' : 'REJECT'}  ${meta.label}${failed ? ' — ' + failed.name.slice(4) : ''}`);
+  if (s.audit.length > 12) s.audit.pop();
+  return result;
+}
+
+/* ============================================================
+   3. Experiments (scripted runs against the engines)
+   ============================================================ */
+const sameLog = (a, b) => a.log.length === b.log.length && a.log.every((e, i) => e.label === b.log[i].label && e.term === b.log[i].term);
+function cmdOK(c, type){ const L = leaderNode(c); if (!L) return false; sendCommand(c, L.id, type); return L.commit === L.log.length; }
+const EXPS = [
+ { key: 'follower', cond: 'Follower fails', q: 'Does the cluster keep making decisions with one replica fewer?',
+   base: 'Not applicable: there are no followers. The single broker is also the only process.',
+   run(){
+     const c = makeCluster(3); adv(c, 4); const g0 = c.job.gen, L0 = leaderNode(c).id;
+     crash(c, c.nodes.find(x => x.role === 'follower').id);
+     const committed = cmdOK(c, 'alloc'); adv(c, 6);
+     const L1 = leaderNode(c), lost = 6 - (c.job.gen - g0);
+     return { ok: committed && L1 && L1.id === L0 && lost === 0, ev: [
+       `Leader before and after: node ${L0} and node ${L1 ? L1.id : 'none'} (no change)`,
+       `A command sent after the failure ${committed ? 'COMMITTED with 2 of 3 replicas' : 'did not commit'}`,
+       `Generations completed in 6 ticks: ${c.job.gen - g0} (fault-free control: 6, lost: ${lost})` ] };
+   } },
+ { key: 'leader', cond: 'Leader fails', q: 'Is a new leader elected, and is nothing already committed lost or contradicted?',
+   base: 'The broker is the leader. If it stops there is no allocation, tracking or control until someone restarts it, and its in-memory state is gone.',
+   run(){
+     const c = makeCluster(3); adv(c, 4); cmdOK(c, 'alloc'); cmdOK(c, 'checkpoint');
+     const L0 = leaderNode(c), before = L0.log.slice(0, L0.commit).map(e => ({ ...e })), g0 = c.job.gen;
+     crash(c, L0.id); adv(c, 8);
+     const L1 = leaderNode(c); const kept = L1 && before.every((e, i) => L1.log[i] && L1.log[i].label === e.label && L1.log[i].term === e.term);
+     const after = L1 ? cmdOK(c, 'alloc') : false, lost = 8 - (c.job.gen - g0);
+     return { ok: !!L1 && L1.id !== L0.id && kept && after, ev: [
+       `Old leader: node ${L0.id} (term ${L0.term}); new leader: node ${L1 ? L1.id : 'none'} (term ${L1 ? L1.term : '-'})`,
+       `All ${before.length} entries committed before the failure are still in the new leader’s log, same order and terms: ${kept ? 'yes' : 'NO'}`,
+       `First command in the new term ${after ? 'COMMITTED' : 'did not commit'}`,
+       `Ticks without progress: ${lost} (election plus workers re-attaching); the job then resumed` ] };
+   } },
+ { key: 'restart', cond: 'Failed replica restarts', q: 'Does it rejoin safely and catch up without disturbing the leader?',
+   base: 'Restarting the broker means workers re-register from scratch and the job state must be rebuilt.',
+   run(){
+     const c = makeCluster(3); adv(c, 3);
+     const L0 = leaderNode(c), f = c.nodes.find(x => x.role === 'follower');
+     crash(c, f.id); cmdOK(c, 'alloc'); cmdOK(c, 'alloc'); cmdOK(c, 'checkpoint');
+     const lenBefore = f.log.length, term0 = L0.term;
+     restart(c, f.id); const L1 = leaderNode(c);
+     const same = sameLog(f, L1);
+     return { ok: same && f.role === 'follower' && L1.id === L0.id && L1.term === term0, ev: [
+       `Node ${f.id} log length before restart: ${lenBefore}; after: ${f.log.length} (leader has ${L1.log.length})`,
+       `Logs identical to the leader’s: ${same ? 'yes' : 'NO'}`,
+       `Node ${f.id} role after restart: ${f.role}; leader still node ${L1.id}, term ${L1.term} (was ${term0}): no competing leader` ] };
+   } },
+ { key: 'dup', cond: 'Delayed or duplicated control messages', q: 'Is a repeated or late command acted on at most once, or rejected?',
+   base: 'No built-in freshness check: a duplicated or delayed message is applied again.',
+   run(){
+     const s = newSec(); secRun(s, 'legit'); const d = secRun(s, 'dup'), l = secRun(s, 'late');
+     const b = newSec(); b.controls.fresh = false; secRun(b, 'legit'); const bd = secRun(b, 'dup');
+     return { ok: !d.accepted && !l.accepted && s.applied.length === 1, ev: [
+       `Control run: 1 command applied. After a duplicate and a 45 s-late command: ${s.applied.length} applied (unchanged)`,
+       `Duplicate: ${d.accepted ? 'ACCEPTED' : 'rejected'} — ${d.steps.find(x => x.st === 'fail')?.note || ''}`,
+       `Delayed: ${l.accepted ? 'ACCEPTED' : 'rejected'} — ${l.steps.find(x => x.st === 'fail')?.note || ''}`,
+       `Comparison with the freshness check off: duplicate ${bd.accepted ? 'ACCEPTED' : 'rejected'}, commands applied: ${b.applied.length}` ] };
+   } },
+ { key: 'join', cond: 'Unauthorised node attempts to connect', q: 'Is it refused, and how do you know membership did not change?',
+   base: 'No membership concept: anything that can reach the broker’s address can register as a worker.',
+   run(){
+     const s = newSec(), m0 = s.members.join(', '); const r = secRun(s, 'join');
+     const b = newSec(); b.controls.auth = false; b.controls.mac = false; const rb = secRun(b, 'join');
+     return { ok: !r.accepted && s.members.join(', ') === m0, ev: [
+       `Membership before: ${m0}`, `Attempt by X9: ${r.accepted ? 'ACCEPTED' : 'rejected'} — ${r.steps.find(x => x.st === 'fail')?.note || ''}`,
+       `Membership after: ${s.members.join(', ')} (${s.members.join(', ') === m0 ? 'unchanged' : 'CHANGED'})`,
+       `Receiver audit line: “${s.audit[0]}”`,
+       `Comparison with authentication and integrity off: ${rb.accepted ? 'X9 joined, members: ' + b.members.length : 'rejected'}` ] };
+   } },
+ { key: 'ckpt', cond: 'Stale or modified checkpoint metadata', q: 'Is it detected before it is used to restore the job?',
+   base: 'Checkpoint location is just a stored value: whatever is read back is trusted.',
+   run(){
+     const s = newSec(); const ok = secRun(s, 'ckok'), t = secRun(s, 'cktamper'), st = secRun(s, 'ckstale');
+     const b = newSec(); b.controls.ckpt = false; const bt = secRun(b, 'cktamper'), bs = secRun(b, 'ckstale');
+     return { ok: ok.accepted && !t.accepted && !st.accepted && s.restored.gen === 120, ev: [
+       `Control case, valid metadata: ${ok.accepted ? 'accepted, restored at generation ' + s.restored.gen : 'REJECTED'}`,
+       `Modified (gen 120→180): ${t.accepted ? 'ACCEPTED' : 'rejected'} — ${t.steps.find(x => x.st === 'fail')?.note || ''}`,
+       `Stale (gen 60): ${st.accepted ? 'ACCEPTED' : 'rejected'} — ${st.steps.find(x => x.st === 'fail')?.note || ''}`,
+       `Comparison with the check off: modified ${bt.accepted ? 'accepted' : 'rejected'}, stale ${bs.accepted ? 'accepted' : 'rejected'}; job restored at generation ${b.restored ? b.restored.gen : '-'}` ] };
+   } }
+];
+
+/* ============================================================
+   4. Threat model data
+   ============================================================ */
+const THREATS = [
+ { id: 'R1', title: 'Authenticate replicas and workers', asset: 'Node identities; the replicated job state', b: ['B2', 'B3'],
+   threat: 'A process pretends to be a replica or a worker and takes part in decisions.',
+   req: 'Every replica and worker proves its identity before any control message from it is accepted.',
+   ctl: 'Mutual TLS with certificates from a private CA, or a per-node key. Identity checked on every connection and bound to the node ID.',
+   lab: ['sec', 'join'], test: 'Experiment 5; Security gate: “Unauthorised node tries to join”.' },
+ { id: 'R2', title: 'Prevent unauthorised cluster membership', asset: 'The membership list', b: ['B2', 'B3'],
+   threat: 'A rogue node adds itself, or is added by an attacker, and gets votes or work.',
+   req: 'Membership changes only through an administrator-signed configuration; unlisted nodes are refused.',
+   ctl: 'Static allowlist or signed membership entry in the replicated log; refused connections logged on both sides.',
+   lab: ['sec', 'join'], test: 'Experiment 5: membership view before and after.' },
+ { id: 'R3', title: 'Protect control-message integrity', asset: 'Pause, resume, checkpoint and terminate commands', b: ['B1', 'B2', 'B3'],
+   threat: 'A command is altered in transit, for example an allocation changed or a pause turned into a terminate.',
+   req: 'A message that fails its integrity check is dropped and logged, never applied.',
+   ctl: 'Per-message authentication tag over header and payload (HMAC), in addition to transport security.',
+   lab: ['sec', 'tamper'], test: 'Extra test in the Security gate: “Command modified in transit”.' },
+ { id: 'R4', title: 'Detect duplicated, delayed or replayed commands', asset: 'Job state and generation counter', b: ['B1', 'B3'],
+   threat: 'An old or repeated command is applied again and changes the job at the wrong time.',
+   req: 'A command is applied at most once and only within its validity window.',
+   ctl: 'Per-sender sequence numbers, a timestamp window and idempotent command IDs; receivers remember the last sequence seen.',
+   lab: ['sec', 'dup'], test: 'Experiment 4; Security gate: duplicated and delayed command.' },
+ { id: 'R5', title: 'Reject commands from a stale former leader', asset: 'Consistency of control decisions', b: ['B2', 'B3'],
+   threat: 'A partitioned former leader keeps issuing signed commands that conflict with the new leader.',
+   req: 'Receivers reject any command whose term is lower than the highest term they have seen.',
+   ctl: 'Term carried in every message and checked by followers and workers; a leader needs a quorum to commit.',
+   lab: ['raft', null], test: 'Experiment 2; Raft cluster: cut off the leader, command both; Security gate: “Stale former leader”.' },
+ { id: 'R6', title: 'Detect tampered or stale checkpoint metadata', asset: 'The checkpoint pointer (generation and hash)', b: ['B4'],
+   threat: 'An attacker alters the generation or points restore at an older checkpoint.',
+   req: 'Metadata is verified against its contents and the latest committed checkpoint before any restore.',
+   ctl: 'Tag over (job, generation, hash, term); compare with the replicated latest-valid pointer; verify the data hash before loading.',
+   lab: ['sec', 'cktamper'], test: 'Experiment 6; Security gate: tampered and stale checkpoint.' }
+];
+const OUT_OF_SCOPE = [
+  'Compromise of a replica’s private key or a malicious majority (Raft tolerates crashes, not Byzantine faults).',
+  'Denial of service by flooding the leader.',
+  'Confidentiality of the board contents, if the brief does not require it.',
+  'Attacks on clocks, side channels, and physical access to machines.'
+];
+
+/* ============================================================
+   5. State and rendering
+   ============================================================ */
+let tab = 'raft';
+let cluster = makeCluster(3), size = 3, cmdType = 'alloc', showB = true;
+let sec = newSec(), secResult = null, secSel = null;
+let expResults = new Array(EXPS.length).fill(null);
+let thrSel = 0;
+const tm = { n: 3, hb: 100, et: 500, rtt: 5, reattach: 200, fsync: 3, genms: 100, mac: 0.1, broker: 5000 };
+
+const TABS = [['raft', 'Raft cluster'], ['sec', 'Security gate'], ['exp', 'Experiments'], ['time', 'Timing and overhead'], ['threat', 'Threat model']];
+function renderTabs(){
+  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-act="tab:${k}" data-k="tab-${k}">${l}</button>`).join('');
+}
+
+/* ---- Raft tab ---- */
+function nodePos(c, i){
+  const a = (-90 + 360 / c.n * i) * Math.PI / 180;
+  return { x: 470 + 190 * Math.cos(a), y: 205 + 60 * Math.sin(a) };
+}
+function diagram(c){
+  const L = leaderNode(c);
+  const ctrl = { x: 110, y: 52 };
+  const wk = [260, 350, 440].map(x => ({ x, y: 365 }));
+  let s = `<svg class="diag" viewBox="0 0 780 420" role="img" aria-label="Control plane diagram: controller, replica cluster, workers and checkpoint store">`;
+  s += `<rect x="190" y="92" width="560" height="224" rx="12" fill="none" stroke="var(--amber)" stroke-dasharray="6 4" stroke-width="1.5"/>`;
+  s += `<text x="202" y="110" font-size="12" fill="var(--amber)">Control-plane cluster: ${c.n} replicas, quorum ${c.quorum}</text>`;
+  // replica mesh from every believed leader
+  const bel = c.nodes.filter(x => x.alive && x.role === 'leader');
+  for (const l of bel) for (const m of c.nodes){
+    if (m === l || !m.alive) continue;
+    const a = nodePos(c, l.id - 1), b = nodePos(c, m.id - 1), conn = !l.isolated && !m.isolated;
+    s += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${conn ? 'var(--indigo)' : 'var(--rose)'}" stroke-width="${conn ? 2 : 1.5}" ${conn ? '' : 'stroke-dasharray="3 5"'} />`;
+    if (!conn) s += `<text x="${(a.x + b.x) / 2}" y="${(a.y + b.y) / 2 + 4}" text-anchor="middle" font-size="14" fill="var(--rose)">✕</text>`;
+  }
+  // controller, workers, store links
+  const lp = L ? nodePos(c, L.id - 1) : { x: 470, y: 205 };
+  const lk = (a, b) => `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${L ? 'var(--muted)' : 'var(--rose)'}" stroke-width="1.5" ${L ? '' : 'stroke-dasharray="4 4"'}/>`;
+  s += lk({ x: ctrl.x, y: 74 }, lp);
+  wk.forEach(w => { s += lk({ x: w.x, y: 345 }, lp); });
+  s += lk({ x: 640, y: 345 }, lp);
+  if (!L) s += `<text x="470" y="262" text-anchor="middle" font-size="13" font-weight="700" fill="var(--rose)">no leader: nothing is allocated or committed</text>`;
+  // controller
+  s += `<rect x="40" y="30" width="140" height="44" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/><text x="110" y="57" text-anchor="middle" font-size="14" font-weight="600" fill="var(--ink)">Controller</text>`;
+  // workers
+  s += `<rect x="200" y="336" width="290" height="62" rx="10" fill="none" stroke="var(--amber)" stroke-dasharray="6 4"/><text x="210" y="352" font-size="11" fill="var(--amber)"> </text>`;
+  wk.forEach((w, i) => { s += `<rect x="${w.x - 36}" y="350" width="72" height="34" rx="6" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/><text x="${w.x}" y="372" text-anchor="middle" font-size="13" fill="var(--ink)">W${i + 1}</text>`; });
+  // store
+  const js = jobState(c);
+  s += `<rect x="580" y="336" width="150" height="62" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/><text x="655" y="361" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">Checkpoint store</text><text x="655" y="379" text-anchor="middle" font-size="11" fill="var(--muted)">${js.ckpt ? 'latest: gen ' + js.ckpt.gen + ' (term ' + js.ckpt.term + ')' : 'none committed yet'}</text>`;
+  // nodes
+  for (const x of c.nodes){
+    const p = nodePos(c, x.id - 1);
+    let stroke = 'var(--line)', fill = 'var(--surface)', dash = '', sw = 1.5, op = 1;
+    if (x.role === 'leader'){ stroke = 'var(--indigo)'; fill = 'var(--indigo-soft)'; sw = 3; }
+    if (x.role === 'candidate'){ stroke = 'var(--amber)'; fill = 'var(--amber-soft)'; sw = 2.5; }
+    if (!x.alive){ dash = 'stroke-dasharray="5 4"'; op = .55; stroke = 'var(--muted)'; }
+    if (x.isolated && x.alive){ stroke = 'var(--rose)'; dash = 'stroke-dasharray="2 4"'; sw = 3; }
+    const role = !x.alive ? 'crashed' : x.role;
+    s += `<g opacity="${op}"><rect x="${p.x - 52}" y="${p.y - 28}" width="104" height="56" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${dash}/>
+      <text x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">Node ${x.id}</text>
+      <text x="${p.x}" y="${p.y + 8}" text-anchor="middle" font-size="12" fill="var(--ink)">${role}${x.isolated && x.alive ? ' · cut off' : ''}</text>
+      <text x="${p.x}" y="${p.y + 22}" text-anchor="middle" font-size="11" fill="var(--muted)">term ${x.term} · commit ${x.commit}</text></g>`;
+  }
+  // trust boundary badges
+  if (showB){
+    const badge = (x, y, t) => `<g><rect x="${x - 13}" y="${y - 10}" width="26" height="20" rx="10" fill="var(--amber-soft)" stroke="var(--amber)"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--amber)">${t}</text></g>`;
+    s += badge((ctrl.x + lp.x) / 2 + 20, (74 + lp.y) / 2 - 10, 'B1') + badge(730, 108, 'B2') + badge(190, 392, 'B3') + badge(730, 392, 'B4');
+  }
+  // packets
+  if (!reduceMotion && c.lastSend && Date.now() - c.lastSend.at < 900){
+    const a = nodePos(c, c.lastSend.from - 1);
+    for (const t of c.lastSend.to){
+      const b = nodePos(c, t - 1);
+      s += `<circle r="5" fill="var(--green)"><animateMotion dur="0.7s" fill="freeze" path="M${a.x},${a.y} L${b.x},${b.y}"/></circle>`;
+    }
+  }
+  return s + '</svg>';
+}
+function jobPanel(c){
+  const js = jobState(c), L = leaderNode(c);
+  const cls = c.status === 'Running' ? 'good' : (c.status.startsWith('Leader') ? 'warn' : (c.status.startsWith('Paused') ? 'ind' : 'bad'));
+  const h = c.job.hist.slice(-40), mn = Math.min(...h), mx = Math.max(...h, mn + 1);
+  const pts = h.map((v, i) => `${(i / Math.max(h.length - 1, 1) * 200).toFixed(1)},${(42 - (v - mn) / (mx - mn) * 38).toFixed(1)}`).join(' ');
+  return `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><div class="note">Completed generations</div><div class="big">${c.job.gen}</div></div><span class="pill ${cls}">${esc(c.status)}</span></div>
+    <canvas id="board" width="${BW * 10}" height="${BH * 10}" aria-label="Game of Life board for the running job"></canvas>
+    <svg class="spark" viewBox="0 0 200 46" preserveAspectRatio="none" role="img" aria-label="Generation count over time; flat segments mean no progress"><polyline points="${pts}" fill="none" stroke="var(--indigo)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+    <div class="note">Generations per tick. A flat line means the job made no progress.</div>
+    <dl class="kv"><dt>Leader</dt><dd>${L ? 'node ' + L.id + ' (term ' + L.term + ')' : 'none'}</dd>
+    <dt>Job paused</dt><dd>${js.paused ? 'yes' : 'no'}</dd><dt>Allocations committed</dt><dd>${js.allocs}</dd>
+    <dt>Latest checkpoint</dt><dd>${js.ckpt ? 'generation ' + js.ckpt.gen : 'none'}</dd></dl>`;
+}
+function paintBoard(){
+  const cv = $('#board'); if (!cv) return;
+  const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
+  const stalled = cluster.status !== 'Running';
+  g.globalAlpha = stalled ? .3 : 1; g.fillStyle = cssv('--indigo');
+  for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) if (cluster.job.board[y * BW + x]) g.fillRect(x * 10 + 1, y * 10 + 1, 8, 8);
+}
+function raftView(){
+  const c = cluster, reach = mainGroup(c).length, live = leaderNode(c);
+  const rows = c.nodes.map(x => {
+    const role = !x.alive ? 'crashed' : x.role;
+    const pc = role === 'leader' ? 'ind' : role === 'candidate' ? 'warn' : role === 'crashed' ? 'bad' : '';
+    const log = x.log.length ? x.log.map((e, i) => `<span class="chip ${i >= x.commit ? 'unc' : ''} ${e.type === 'noop' ? 'noop' : ''}" title="term ${e.term}${e.type !== 'noop' ? ', ' + TYPES[e.type][1] : ''}">${e.label}</span>`).join('') : '<span class="note">empty log</span>';
+    return `<tr><td><b>Node ${x.id}</b><br><span class="pill ${pc}">${role}</span>${x.isolated ? ' <span class="pill bad">cut off</span>' : ''}</td>
+      <td>${x.term}</td><td>${x.commit}</td><td>${log}</td>
+      <td><div class="row" style="gap:5px">${x.alive ? `<button class="btn" data-act="crash:${x.id}" data-k="c${x.id}">Crash</button>` : `<button class="btn" data-act="restart:${x.id}" data-k="r${x.id}">Restart</button>`}
+      ${x.alive && !x.isolated ? `<button class="btn" data-act="cut:${x.id}" data-k="u${x.id}">Cut off</button>` : ''}${x.isolated ? `<button class="btn" data-act="heal:${x.id}" data-k="h${x.id}">Reconnect</button>` : ''}
+      ${x.alive && x.role === 'leader' ? `<button class="btn pri" data-act="send:${x.id}" data-k="s${x.id}">Send command</button>` : ''}</div></td></tr>`;
+  }).join('');
+  return `<div class="grid2">
+    <div>
+      <div class="row" style="margin-bottom:10px">
+        <label class="note">Cluster size <select data-chg="size">${[3, 5].map(n => `<option value="${n}" ${n === size ? 'selected' : ''}>${n} replicas</option>`).join('')}</select></label>
+        <label class="note">Command <select data-chg="cmd">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${k === cmdType ? 'selected' : ''}>${v[1]}</option>`).join('')}</select></label>
+        <label class="note"><input type="checkbox" data-chg="showB" ${showB ? 'checked' : ''}> Show trust boundaries</label>
+        <button class="btn" data-act="reset" data-k="reset">Reset</button>
+        <span class="pill ${live ? 'good' : 'bad'}" style="margin-left:auto">Quorum ${c.quorum} of ${c.n} · ${reach} reachable · ${live ? 'can make progress' : 'cannot elect or commit'}</span>
+      </div>
+      <div id="diagram">${diagram(c)}</div>
+      <p class="note" style="margin-top:8px"><b>B1 to B4</b> are the trust boundaries from the brief: controller to cluster, replica to replica, cluster to workers, cluster to checkpoint store.</p>
+    </div>
+    <div id="job">${jobPanel(c)}</div>
+  </div>
+  <div class="sec"><h2>Replicas and their logs</h2>
+    <div class="tw"><table><thead><tr><th>Replica</th><th>Term</th><th>Committed</th><th>Log</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="legend"><span><span class="chip">A1</span> committed entry</span><span><span class="chip unc">A2</span> not committed: must not be acted on</span><span><span class="chip noop">∅</span> leader no-op</span><span>A allocate · P pause · R resume · K checkpoint</span></div>
+  </div>
+  <div class="grid2"><div class="sec"><h2>Event log</h2><ul class="events">${c.events.slice(0, 14).map(e => `<li class="${e.kind}"><span class="g">gen ${e.g}</span>${esc(e.m)}</li>`).join('')}</ul></div>
+  <div class="sec"><h2>Things to try</h2><ol class="tight">
+    <li>Crash the leader. Watch the term rise and the generation line go flat while workers re-attach.</li>
+    <li>Cut off the leader, then send a command to it, then to the new leader. Reconnect the old one: its entry disappears.</li>
+    <li>Crash a node, send several commands, restart it. It catches up and does not take over.</li>
+    <li>Crash a majority. The job stops rather than risk conflicting decisions. Is that the behaviour you want?</li>
+    <li>Send Pause, then crash the leader. Does the pause survive the failover?</li></ol></div></div>`;
+}
+
+/* ---- Security tab ---- */
+const CTL = [['auth', 'Authentication and membership', 'Reject senders without a certificate'], ['mac', 'Message integrity', 'Per-message authentication tag'], ['fresh', 'Freshness and replay detection', 'Timestamp window and sequence numbers'], ['fence', 'Term fencing', 'Reject commands from a stale former leader'], ['ckpt', 'Checkpoint binding', 'Tag over metadata plus latest-generation check']];
+function envHtml(r){
+  const e = r.env, ch = f => r.changed.includes(f) ? 'chg' : '';
+  if (e.kind === 'ckpt'){
+    const k = e.ckpt;
+    return `<dl class="env"><dt>Kind</dt><dd>checkpoint metadata</dd><dt>Job</dt><dd>${k.job}</dd><dt>Generation</dt><dd class="${ch('gen')}">${k.gen}</dd><dt>Data hash</dt><dd>${k.hash}</dd><dt>Term</dt><dd>${k.term}</dd><dt>Tag</dt><dd>${k.mac}</dd></dl>`;
+  }
+  return `<dl class="env"><dt>Kind</dt><dd>${e.kind === 'join' ? 'membership request' : 'control command'}</dd><dt>From</dt><dd>${e.from}</dd><dt>Term</dt><dd>${e.term}</dd><dt>Sequence</dt><dd>${e.seq}</dd><dt>Sent at</dt><dd>t=${e.ts}${r.id === 'late' ? ' (45 s before arrival)' : ''}</dd><dt>Command</dt><dd class="${ch('cmd')}">${esc(e.cmd)}</dd><dt>Tag</dt><dd>${e.mac}</dd></dl>`;
+}
+function resultHtml(r){
+  if (!r) return `<p class="note">Pick a scenario on the left. Each message runs through the receiver’s checks in order. Switch a control off to see what the attack would have done.</p>`;
+  const meta = SCEN[r.id], icons = { pass: '✓', fail: '✕', off: '!', skip: '–', na: '–' };
+  let banner;
+  if (r.accepted && meta.attack) banner = `<div class="banner bad">Attack succeeded. ${esc(meta.hit)}</div>`;
+  else if (r.accepted) banner = `<div class="banner good">Accepted: this is the intended behaviour for a legitimate message.</div>`;
+  else banner = `<div class="banner ${meta.attack ? 'good' : 'bad'}">${meta.attack ? 'Blocked at' : 'Wrongly rejected at'} “${esc(r.blockedBy.slice(4))}”</div>`;
+  return `<h3>${esc(meta.label)}</h3><p>${esc(meta.text)}</p>${r.pre ? '<p class="note">An original command was sent first so there is something to repeat.</p>' : ''}${envHtml(r)}
+    <h3 style="margin-top:14px">Receiver checks</h3>${r.steps.map(x => `<div class="step"><span class="ico ${x.st}">${icons[x.st]}</span><div><b>${x.name}</b><br><span class="note">${esc(x.note)}</span></div></div>`).join('')}${banner}`;
+}
+function secLedger(){
+  const s = sec;
+  return `<div class="grid2"><div><h3>Receiver state</h3><dl class="kv"><dt>Current term, leader</dt><dd>${s.term}, ${s.leader}</dd><dt>Members (${s.members.length})</dt><dd>${s.members.join(', ')}</dd><dt>Last accepted sequence</dt><dd>R2: ${s.lastSeq.R2}</dd><dt>Latest committed checkpoint</dt><dd>generation ${s.latest.gen}</dd><dt>Job restored from</dt><dd>${s.restored ? 'generation ' + s.restored.gen : 'not restored'}</dd></dl>
+  <h3>Applied commands</h3>${s.applied.length ? '<ul class="tight">' + s.applied.map(a => `<li>${esc(a)}</li>`).join('') + '</ul>' : '<p class="note">None yet.</p>'}</div>
+  <div><h3>Audit log</h3>${s.audit.length ? '<ul class="events">' + s.audit.map(a => `<li class="${a.startsWith('ACCEPT') ? '' : 'good'}">${esc(a)}</li>`).join('') + '</ul>' : '<p class="note">Nothing received yet.</p>'}</div></div>`;
+}
+function secView(){
+  return `<p class="lede">Failover has already happened in this lab: R2 is leader in term 2, and R1 is the deposed leader from term 1. This tab is separate from the Raft tab. The tags use a toy hash so you can see the mechanism; a real build should use mutual TLS and HMAC-SHA256 or similar.</p>
+  <div class="grid2" style="margin-top:14px"><div>
+    <h3>Receiver controls</h3><div class="checks">${CTL.map(([k, t, d]) => `<label><input type="checkbox" data-ctl="${k}" ${sec.controls[k] ? 'checked' : ''}><span><b>${t}</b><br><span class="note">${d}</span></span></label>`).join('')}</div>
+    <h3 style="margin-top:16px">Send a message</h3><div class="scen">${Object.entries(SCEN).map(([k, v]) => `<button class="btn" data-act="sc:${k}" data-k="sc-${k}" aria-pressed="${secSel === k}">${v.label}</button>`).join('')}</div>
+    <p style="margin-top:10px"><button class="btn" data-act="secreset" data-k="secreset">Reset receiver</button></p>
+  </div><div id="secres">${resultHtml(secResult)}</div></div>
+  <div class="sec" id="secledger">${secLedger()}</div>`;
+}
+
+/* ---- Experiments tab ---- */
+function mdTable(){
+  const rows = EXPS.map((e, i) => { const r = expResults[i]; return r ? `| ${e.cond} | ${r.ev.join('; ').replace(/\|/g, '/')} | ${e.base} | ${r.ok ? 'pass' : 'FAIL'} |` : null; }).filter(Boolean);
+  return rows.length ? '| Condition | Observed in the lab | Single-broker baseline | Result |\n|---|---|---|---|\n' + rows.join('\n') : '';
+}
+function expView(){
+  const done = expResults.filter(Boolean).length;
+  return `<p class="lede">Each experiment runs a fresh, scripted scenario against the models and records what the brief asks you to collect. Use the output as a checklist of evidence for your own implementation, not as a substitute for it.</p>
+  <div class="row" style="margin:12px 0"><button class="btn pri" data-act="expall" data-k="expall">Run all six</button><span class="note">${done} of ${EXPS.length} run</span></div>
+  <div class="tw"><table><thead><tr><th>Condition</th><th>Question</th><th>Evidence from the lab</th><th>Single-broker baseline</th><th></th></tr></thead><tbody>
+  ${EXPS.map((e, i) => { const r = expResults[i]; return `<tr><td><b>${i + 1}. ${e.cond}</b></td><td>${e.q}</td>
+    <td>${r ? `<span class="pill ${r.ok ? 'good' : 'bad'}">${r.ok ? 'consistent' : 'inconsistent'}</span><ul class="tight">${r.ev.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<span class="note">Not run yet.</span>'}</td>
+    <td class="note">${e.base}</td><td><button class="btn" data-act="exp:${i}" data-k="exp${i}">${r ? 'Run again' : 'Run'}</button></td></tr>`; }).join('')}</tbody></table></div>
+  ${mdTable() ? `<div class="sec"><h2>Copy for your report</h2><textarea id="md" readonly>${esc(mdTable())}</textarea><p><button class="btn" data-act="copymd" data-k="copymd">Copy as Markdown</button> <span class="note" id="copied"></span></p></div>` : ''}`;
+}
+
+/* ---- Timing tab ---- */
+const SL = [['n', 'Replicas', 3, 5, 2, ''], ['hb', 'Heartbeat interval', 20, 500, 10, ' ms'], ['et', 'Election timeout (base)', 100, 1500, 25, ' ms'], ['rtt', 'Network round trip', 1, 50, 1, ' ms'], ['reattach', 'Workers re-attach', 0, 1000, 25, ' ms'], ['fsync', 'Log write (fsync)', 0, 20, 1, ' ms'], ['genms', 'One generation takes', 20, 500, 10, ' ms'], ['mac', 'Tag compute and verify', 0, 1, 0.05, ' ms'], ['broker', 'Baseline: broker restart', 1000, 30000, 500, ' ms']];
+function timeCalc(){
+  const t = tm, election = 1.5 * t.et + t.rtt, first = 2 * t.rtt + t.fsync + 4 * t.mac;
+  const t1 = election, t2 = t1 + t.reattach + first, t3 = t2 + t.genms;
+  const base = t.broker + t.reattach + t.genms;
+  const latB = t.rtt, latR = 2 * t.rtt + t.fsync, latS = latR + 4 * t.mac;
+  const msgB = 2, msgR = 2 * t.n, idle = 2 * (t.n - 1) * 1000 / t.hb;
+  return { election, t1, t2, t3, base, latB, latR, latS, msgB, msgR, idle, lost: t3 / t.genms, lostB: base / t.genms };
+}
+function timeline(k){
+  const pre = 500, post = 600, total = pre + k.t3 + post, W = 820, x = ms => 40 + ms / total * W;
+  const seg = (a, b, col, label) => `<rect x="${x(a)}" y="40" width="${Math.max(x(b) - x(a), 1)}" height="30" fill="${col}"/>${x(b) - x(a) > 70 ? `<text x="${(x(a) + x(b)) / 2}" y="60" text-anchor="middle" font-size="12" fill="var(--ink)">${label}</text>` : ''}`;
+  const t0 = pre, T1 = pre + k.t1, T2 = pre + k.t2, T3 = pre + k.t3;
+  const gens = ms => { const g0 = pre / tm.genms; return ms <= t0 ? ms / tm.genms : ms >= T3 ? g0 + (ms - T3) / tm.genms : g0; };
+  const gmax = gens(total), pts = [0, t0, T3, total].map(m => `${x(m).toFixed(1)},${(262 - gens(m) / gmax * 70).toFixed(1)}`).join(' ');
+  const lab = (m, t, y) => `<line x1="${x(m)}" y1="28" x2="${x(m)}" y2="190" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="${x(m)}" y="22" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">${t}</text>`;
+  return `<svg class="diag" viewBox="0 0 900 300" role="img" aria-label="Timeline of a leader failure showing t0 to t3 and flat generation count">
+    ${seg(0, t0, 'var(--green-soft)', 'leader coordinating')}${seg(t0, T1, 'var(--rose-soft)', 'no leader')}${seg(T1, T3, 'var(--amber-soft)', 're-attaching, first commit')}${seg(T3, total, 'var(--green-soft)', 'new leader coordinating')}
+    ${lab(t0, 't0')}${lab(T1, 't1')}${lab(T2, 't2')}${lab(T3, 't3')}
+    <line x1="${x(t0)}" y1="100" x2="${x(T1)}" y2="100" stroke="var(--ink)"/><text x="${(x(t0) + x(T1)) / 2}" y="116" text-anchor="middle" font-size="12" fill="var(--ink)">election ${k.election.toFixed(0)} ms</text>
+    <line x1="${x(t0)}" y1="140" x2="${x(T3)}" y2="140" stroke="var(--ink)"/><text x="${(x(t0) + x(T3)) / 2}" y="158" text-anchor="middle" font-size="12" fill="var(--ink)">recovery ${k.t3.toFixed(0)} ms</text>
+    <text x="40" y="214" font-size="12" fill="var(--muted)">completed generations (flat while there is no progress)</text>
+    <polyline points="${pts}" fill="none" stroke="var(--indigo)" stroke-width="2.5"/><text x="450" y="292" text-anchor="middle" font-size="12" fill="var(--muted)">time</text></svg>`;
+}
+function timeOut(){
+  const k = timeCalc(), mxL = Math.max(k.latS, k.latR, k.latB), mxM = k.msgR;
+  const bar = (v, mx, cls) => `<div class="bar ${cls}" style="width:${Math.max(v / mx * 100, 1)}%"></div>`;
+  return `${timeline(k)}
+  <div class="grid2" style="margin-top:16px"><div><h3>When each timestamp is taken</h3><ul class="tight">
+    <li><b>t0</b>: the test harness logs the moment it kills the leader process.</li>
+    <li><b>t1</b>: the new leader logs the moment it wins the election.</li>
+    <li><b>t2</b>: the new leader logs the first entry committed in its term.</li>
+    <li><b>t3</b>: the controller logs the first generation completed afterwards.</li></ul>
+    <p class="note">Election time is t1 − t0 and recovery time is t3 − t0. The model uses an average of 1.5 × the election timeout, because the timeout is randomised between 1 × and 2 ×.</p></div>
+  <div><h3>This model says</h3><dl class="kv"><dt>Election time</dt><dd>${k.election.toFixed(0)} ms</dd><dt>Recovery time</dt><dd>${k.t3.toFixed(0)} ms</dd><dt>Generations not completed</dt><dd>about ${k.lost.toFixed(1)}</dd>
+    <dt>Single broker, same outage</dt><dd>${k.base.toFixed(0)} ms and about ${k.lostB.toFixed(0)} generations, and the broker’s in-memory state is lost</dd></dl></div></div>
+  <div class="sec"><h3>Overhead per control command</h3><div class="bars">
+    <span>Single broker</span>${bar(k.latB, mxL, 'g')}<span class="v">${k.latB.toFixed(2)} ms</span>
+    <span>Replicated</span>${bar(k.latR, mxL, 'a')}<span class="v">${k.latR.toFixed(2)} ms</span>
+    <span>Replicated + security</span>${bar(k.latS, mxL, 'r')}<span class="v">${k.latS.toFixed(2)} ms</span></div>
+    <p class="note" style="margin-top:6px">Critical path: client to leader, leader to a quorum, plus one log write, plus four tag operations.</p>
+    <div class="bars" style="margin-top:12px"><span>Messages: single broker</span>${bar(k.msgB, mxM, 'g')}<span class="v">${k.msgB}</span>
+    <span>Messages: replicated</span>${bar(k.msgR, mxM, 'a')}<span class="v">${k.msgR}</span></div>
+    <p class="note" style="margin-top:6px">Messages per command: one request and reply, plus an append and acknowledgement for each follower. Idle heartbeat traffic adds about ${k.idle.toFixed(0)} messages per second. Security adds roughly 56 bytes per message (sequence, timestamp, term and a 32-byte tag).</p></div>`;
+}
+function timeView(){
+  return `<p class="lede">Move the sliders to see how election timeout, re-attach delay and security costs change the recovery timeline. Treat the output as a model for choosing what to measure, and replace it with measurements from your own harness.</p>
+  <div class="grid2" style="margin-top:12px"><div>${SL.map(([k, l, mn, mx, st, u]) => `<label class="sl"><span>${l}</span><input type="range" min="${mn}" max="${mx}" step="${st}" value="${tm[k]}" data-inp="${k}" aria-label="${l}"><output id="o-${k}">${tm[k]}${u}</output></label>`).join('')}</div><div></div></div>
+  <div class="sec" id="tlout">${timeOut()}</div>`;
+}
+
+/* ---- Threat tab ---- */
+function threatSvg(b){
+  const on = k => b.includes(k);
+  const bd = (x, y, t) => `<g><rect x="${x - 14}" y="${y - 11}" width="28" height="22" rx="11" fill="${on(t) ? 'var(--amber-soft)' : 'var(--surface2)'}" stroke="${on(t) ? 'var(--amber)' : 'var(--line)'}" stroke-width="${on(t) ? 2.5 : 1}"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on(t) ? 'var(--amber)' : 'var(--muted)'}">${t}</text></g>`;
+  const ln = (x1, y1, x2, y2, t) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${on(t) ? 'var(--amber)' : 'var(--muted)'}" stroke-width="${on(t) ? 4 : 1.5}"/>`;
+  const box = (x, y, w, h, t) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/><text x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle" font-size="13" fill="var(--ink)">${t}</text>`;
+  return `<svg class="diag" viewBox="0 0 560 250" role="img" aria-label="Architecture with trust boundaries B1 to B4; the selected requirement’s boundaries are highlighted">
+    ${ln(130, 125, 210, 125, 'B1')}${ln(380, 70, 440, 50, 'B3')}${ln(380, 180, 440, 205, 'B4')}
+    <rect x="210" y="30" width="170" height="190" rx="12" fill="none" stroke="${on('B2') ? 'var(--amber)' : 'var(--line)'}" stroke-width="${on('B2') ? 4 : 1.5}" stroke-dasharray="6 4"/>
+    ${box(230, 50, 130, 34, 'Leader replica')}${box(230, 108, 130, 34, 'Follower replica')}${box(230, 166, 130, 34, 'Follower replica')}
+    ${box(20, 103, 110, 44, 'Controller')}${box(440, 28, 100, 44, 'Workers')}${box(440, 185, 100, 44, 'Checkpoint store')}
+    ${bd(170, 112, 'B1')}${bd(295, 40, 'B2')}${bd(410, 52, 'B3')}${bd(410, 205, 'B4')}</svg>`;
+}
+function threatView(){
+  const t = THREATS[thrSel];
+  return `<p class="lede">The brief asks for a threat model before implementation, with every requirement traceable to a threat. Select a row to see its chain and the boundaries it crosses. The wording here is a starting point for your own model, not a finished one.</p>
+  <div class="grid2" style="margin-top:12px"><div class="tw"><table><thead><tr><th>Requirement from the brief</th><th>Asset</th><th>Boundaries</th></tr></thead><tbody>
+  ${THREATS.map((r, i) => `<tr class="clk ${i === thrSel ? 'sel' : ''}" data-act="thr:${i}" tabindex="0" role="button" data-k="thr${i}"><td><b>${r.id}</b> ${r.title}</td><td>${r.asset}</td><td>${r.b.join(', ')}</td></tr>`).join('')}</tbody></table></div>
+  <div>${threatSvg(t.b)}</div></div>
+  <div class="sec"><h2>${t.id}: ${t.title}</h2>
+    <dl class="kv" style="grid-template-columns:130px 1fr"><dt>Asset</dt><dd>${t.asset}</dd><dt>Threat</dt><dd>${t.threat}</dd><dt>Requirement</dt><dd>${t.req}</dd><dt>Control</dt><dd>${t.ctl}</dd><dt>Evidence</dt><dd>${t.test}</dd></dl>
+    <button class="btn pri" data-act="lab:${t.lab[0]}:${t.lab[1] || ''}" data-k="lab">Open in the lab</button></div>
+  <div class="sec"><h2>Say what is out of scope</h2><p>The brief rewards a threat model that shows what you chose not to defend against, and why. Typical candidates:</p><ul class="tight">${OUT_OF_SCOPE.map(o => `<li>${o}</li>`).join('')}</ul></div>`;
+}
+
+/* ---- shell ---- */
+function render(){
+  const ae = document.activeElement, key = ae && ae.dataset ? ae.dataset.k : null;
+  renderTabs();
+  $('#view').innerHTML = ({ raft: raftView, sec: secView, exp: expView, time: timeView, threat: threatView })[tab]();
+  if (tab === 'raft') paintBoard();
+  if (key){ const el = document.querySelector(`[data-k="${key}"]`); if (el) el.focus({ preventScroll: true }); }
+}
+function runExp(i){ expResults[i] = EXPS[i].run(); }
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const [a, x, y] = b.dataset.act.split(':'), id = +x;
+  if (a === 'tab') tab = x;
+  else if (a === 'reset'){ cluster = makeCluster(size); }
+  else if (a === 'crash') crash(cluster, id);
+  else if (a === 'restart') restart(cluster, id);
+  else if (a === 'cut') isolate(cluster, id);
+  else if (a === 'heal') heal(cluster, id);
+  else if (a === 'send') sendCommand(cluster, id, cmdType);
+  else if (a === 'sc'){ secSel = x; secResult = secRun(sec, x); }
+  else if (a === 'secreset'){ sec = newSec(); secResult = null; secSel = null; }
+  else if (a === 'exp') runExp(id);
+  else if (a === 'expall') EXPS.forEach((_, i) => runExp(i));
+  else if (a === 'copymd'){
+    const ta = $('#md'); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+    if (!ok && navigator.clipboard) navigator.clipboard.writeText(ta.value).then(() => { $('#copied').textContent = 'Copied.'; }, () => {});
+    $('#copied').textContent = ok ? 'Copied.' : 'Select the text above and copy it with your keyboard.'; return;
+  }
+  else if (a === 'thr') thrSel = id;
+  else if (a === 'lab'){ tab = x; if (x === 'sec' && y){ secSel = y; if (y === 'dup' || true) secResult = secRun(sec, y); } }
+  render();
+});
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr.clk')){ e.preventDefault(); e.target.click(); } });
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.chg === 'size'){ size = +t.value; cluster = makeCluster(size); render(); }
+  else if (t.dataset.chg === 'cmd'){ cmdType = t.value; }
+  else if (t.dataset.chg === 'showB'){ showB = t.checked; render(); }
+  else if (t.dataset.ctl){ sec.controls[t.dataset.ctl] = t.checked; }
+});
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset.inp) return;
+  tm[t.dataset.inp] = +t.value;
+  const u = (SL.find(s => s[0] === t.dataset.inp) || [])[5] || '';
+  $('#o-' + t.dataset.inp).textContent = t.value + u;
+  $('#tlout').innerHTML = timeOut();
+});
+setInterval(() => {
+  tick(cluster);
+  if (tab === 'raft'){ const j = $('#job'); if (j){ j.innerHTML = jobPanel(cluster); paintBoard(); } }
+}, 700);
+render();
+</script>
+</body>
+</html>
